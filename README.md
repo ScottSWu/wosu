@@ -7,6 +7,13 @@ This is a library based off of jQuery, three.js and lzma.js for reading and disp
 
 Wosu provides both data structures and functions for parsing beatmaps, storyboards and replays.
 
+An example of this library in use can be found [here](http://sc-wu.com/p/Wosu/).
+
+
+
+Usage
+----
+
 **Beatmaps**
 
     $.ajax({
@@ -67,3 +74,10 @@ and
 Finally, the player may be started using
 
     player.play();
+
+
+
+Making Changes
+----
+
+"combine.py" dumps all the hardcoded filenames into "WOsuData.js", and a list of all the script tags into "ScriptList.txt". The "ext" folder holds external libraries and files.
