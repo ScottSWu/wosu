@@ -1,0 +1,813 @@
+<html>
+<head>
+<!--
+Scott Wu
+funnytrees
+https://osu.ppy.sh/u/1926088
+47be1f67c35cb3bd7fdaae284c21c69a
+-->
+<title>Web osu! Replay Viewer</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8;" />
+<link type="text/css" href="main.css" rel="stylesheet" />
+<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+
+<script type="text/javascript" src="lib/ext/base64.js"></script>
+<script type="text/javascript" src="lib/ext/three.min.js"></script>
+<script type="text/javascript" src="lib/ext/jquery.min.js"></script>
+<script type="text/javascript" src="lib/ext/jquery-ui.min.js"></script>
+<script type="text/javascript" src="lib/ext/json.js"></script>
+<script type="text/javascript" src="lib/ext/lzma.min.js"></script>
+
+<script type="text/javascript" src="lib/WOsu.js"></script>
+<!--
+-->
+<script type="text/javascript" src="lib/WOsuData.js"></script>
+<!--
+<script type="text/javascript" src="lib/beatmap/Beatmap.js"></script>
+<script type="text/javascript" src="lib/beatmap/BeatmapLoader.js"></script>
+<script type="text/javascript" src="lib/beatmap/BeatmapData.js"></script>
+<script type="text/javascript" src="lib/beatmap/BeatmapEvents.js"></script>
+<script type="text/javascript" src="lib/beatmap/BeatmapObjects.js"></script>
+<script type="text/javascript" src="lib/beatmap/BeatmapMechanics.js"></script>
+<script type="text/javascript" src="lib/event/Event.js"></script>
+<script type="text/javascript" src="lib/event/BackgroundEvent.js"></script>
+<script type="text/javascript" src="lib/event/BreakPeriod.js"></script>
+<script type="text/javascript" src="lib/event/StoryboardEvent.js"></script>
+<script type="text/javascript" src="lib/event/StoryboardObject.js"></script>
+<script type="text/javascript" src="lib/event/TimingPoint.js"></script>
+<script type="text/javascript" src="lib/event/ColourEvent.js"></script>
+<script type="text/javascript" src="lib/object/HitObject.js"></script>
+<script type="text/javascript" src="lib/object/SliderObject.js"></script>
+<script type="text/javascript" src="lib/object/SpinnerObject.js"></script>
+<script type="text/javascript" src="lib/player/Player.js"></script>
+<script type="text/javascript" src="lib/skin/Skin.js"></script>
+<script type="text/javascript" src="lib/skin/SkinLoader.js"></script>
+<script type="text/javascript" src="lib/replay/Replay.js"></script>
+<script type="text/javascript" src="lib/replay/ReplayLoader.js"></script>
+<script type="text/javascript" src="lib/math/Matrix3.js"></script>
+<!-- -->
+</head>
+<body>
+<script>
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+	ga('create', 'UA-52268041-1', 'wosu.ga');
+	ga('send', 'pageview');
+</script>
+<script type="text/javascript">
+var ORV = {};
+
+$(document).ready(function() {
+	// These brackets make collapsing levels easier
+	var dmenu,dgame;
+	{
+		// Local api, perhaps write server software to self-host an API from Songs folder?
+		
+		dmenu = $(document.createElement("div"));
+		$(document.body).append(dmenu);
+		
+		dgame = $(document.createElement("div"));
+		$(document.body).append(dgame);
+		
+		ORV.winWidth	= window.innerWidth;
+		ORV.winHeight	= window.innerHeight;
+		ORV.debug       = {};
+		
+		ORV.player = new WOsu.Player({
+			width  : ORV.winWidth,
+			height : ORV.winHeight,
+			
+			progressCallback   : showProgress,
+			completionCallback : showCompletion,
+			errorCallback      : showError,
+		});
+	}
+	
+	// Top
+	var logoFront,logoBack,logoContainer;
+	{
+		logoFront =
+			$(document.createElement("img"))
+				.attr("src","images/title_logo.png")
+				.css({
+					"position"		: "absolute",
+					"width"			: "360px",
+					"height"		: "360px",
+				})
+		;
+		logoBack =
+			$(document.createElement("img"))
+				.attr("src","images/bg.png")
+				.css({
+					"position"		: "absolute",
+					"width"			: "360px",
+					"height"		: "360px",
+					"opacity"		: "0.5",
+				})
+		;
+		
+		logoContainer =
+			$(document.createElement("div"))
+				.css({
+					"width"			: "360px",
+					"height"		: "360px",
+					"margin-left"	: "auto",
+					"margin-right"	: "auto",
+					"margin-top"	: "40px",
+					"padding"		: "0px",
+				})
+		;
+		
+		logoContainer.append(logoBack);
+		logoContainer.append(logoFront);
+		
+		dmenu.append(logoContainer);
+	};
+	
+	// Buttons and stuff
+	var s1css,s2css,replaySelector,optionSelector,submitSelector,replayContainer;
+	{
+		s1css = {
+			"margin"			: "20px",
+			"float"				: "left",
+		};
+		s2css = {
+			"display"			: "table-cell",
+			"width"				: "240px",
+			"height"			: "80px",
+			"margin"			: "20px",
+			
+			"color"				: "#FFFFFF",
+			"font-family"		: "'Ubuntu',sans serif",
+			"font-size"			: "24px",
+			"font-weight"		: "bold",
+			"text-align"		: "center",
+			"vertical-align"	: "middle",
+			
+			"box-shadow"		: "0px 0px 10px #FFFFFF",
+			"border-radius"		: "5px",
+			
+			"cursor"			: "pointer",
+		};
+		
+		// Modified from
+		// http://www.colourlovers.com/palette/1930/cheer_up_emo_kid
+		
+		replaySelector =
+			$(document.createElement("div"))
+				.css(s2css)
+				.text("Select Replay")
+				.css("background-color","#EF5B5B")
+		;
+		
+		optionSelector =
+			$(document.createElement("div"))
+				.css(s2css)
+				.text("Modify Options")
+				.css("background-color","#A7D444")
+		;
+		
+		submitSelector =
+			$(document.createElement("div"))
+				.css(s2css)
+				.text("Play")
+				.css("background-color","#455288")
+		;
+		
+		replayContainer =
+			$(document.createElement("div"))
+				.css({
+					"width": "840px",
+					"margin-left": "auto",
+					"margin-right": "auto",
+					"margin-top": "40px",
+				})
+		;
+		
+		replayContainer.append($(document.createElement("div")).css(s1css).append(replaySelector));
+		replayContainer.append($(document.createElement("div")).css(s1css).append(optionSelector));
+		replayContainer.append($(document.createElement("div")).css(s1css).append(submitSelector));
+		
+		dmenu.append(replayContainer);
+	};
+	
+	// Windows
+	var wincss,labelcss,replayWindow,optionWindow,options = {};
+	{
+		wincss = {
+			"position"        : "absolute",
+			"top"             : "40px",
+			"left"            : "50%",
+			"width"           : "800px",
+			"padding"         : "10px",
+			"margin-left"     : "-410px",
+			
+			"background-color": "#FFFFFF",
+			"border"          : "2px solid #000000",
+			"box-shadow"      : "0px 0px 20px #000000",
+			
+			"font-family"     : "Ubuntu",
+		};
+		
+		labelcss = {
+			"width"           : "140px",
+			"float"           : "left",
+		};
+		
+		errorcss = {
+			"color"           : "#A00000",
+			"text-align"      : "center",
+		};
+		
+		function generateSampleReplays() {
+			var sample_replays = [
+				/*{
+					player : "",
+					map    : "",
+					replay : "",
+				},*/
+				{
+					player : "SapphireGhost",
+					map    : "Xelia - Illumiscape (Kanna) [Extra]",
+					replay : "Replays/SapphireGhost - Xelia - Illumiscape [Extra] (2013-05-28) Osu.osr.json",
+				},
+				{
+					player : "Cookiezi",
+					map    : "xi - FREEDOM DiVE (Nakagawa-Kanon) [FOUR DIMENSIONS]",
+					replay : "Replays/Cookiezi - xi - FREEDOM DiVE [FOUR DIMENSIONS] (2013-02-02) Osu.osr.json",
+				},
+				{
+					player : "funnytrees",
+					map    : "Solid Inc. - What I Found (State Function Remix) (galvenize) [New Day]",
+					replay : "Replays/funnytrees - Solid Inc. - What I Found (State Function Remix) [New Day] (2013-12-20) Osu.osr.json",
+				},
+				{
+					player : "funnytrees",
+					map    : "Avicii - Levels (Nightcore Mix) (Kiyro) [Insane]",
+					replay : "Replays/funnytrees - Avicii - Levels (Nightcore Mix) [Insane] (2014-01-03) Osu.osr.json"
+				},
+				{
+					player : "funnytrees",
+					map    : "momori - Togameru Kage (cRyo[iceeicee]) [Insane]",
+					replay : "Replays/funnytrees - momori - Togameru Kage [Insane] (2013-12-10) Osu.osr.json"
+				},
+				/*{
+					player : "funnytrees",
+					map    : "nano - magenta (LunarSakuya) [Hard]",
+					replay : "Replays/funnytrees - nano - magenta [Hard] (2013-11-25) Osu.osr.json"
+				},
+				{
+					player : "H4ppySt1ck",
+					map    : "HujuniseikouyuuP - Talent Shredder (val0108) [Lesjuh style]",
+					replay : "Replays/H4ppySt1ck - HujuniseikouyuuP - Talent Shredder [Lesjuh style] (2014-01-04) Osu.osr.json"
+				},*/
+			];
+			
+			var div =
+				$(document.createElement("div"))
+					.append(
+						$(document.createElement("div"))
+						.css(labelcss)
+						.html("Sample Replays:")
+					)
+			;
+			var select =
+				$(document.createElement("select"))
+			;
+			var samples = [];
+			
+			for (var i=0; i<sample_replays.length; i++) {
+				var opt = document.createElement("option");
+				opt.value = sample_replays[i].replay;
+				opt.innerHTML = sample_replays[i].map;
+				
+				samples.push(opt);
+			}
+			
+			select.append(samples);
+			div.append(select);
+			
+			return { element: div, value: select };
+		};
+		
+		function generateURLReplay() {
+			var div =
+				$(document.createElement("div"))
+					.append(
+						$(document.createElement("div"))
+						.css(labelcss)
+						.html("OR by URL:")
+					)
+			;
+			var input =
+				$(document.createElement("input"))
+					.attr("type","text")
+					.css({
+						"width" : "400px"
+					})
+			;
+			
+			div.append(input);
+			
+			return { element: div, value: input };
+		};
+		
+		function generateUploadReplay() {
+			var div =
+				$(document.createElement("div"))
+					.append(
+						$(document.createElement("div"))
+						.css(labelcss)
+						.html("OR by Upload:")
+					)
+			;
+			var form =
+				$(document.createElement("form"))
+					.attr("method","POST")
+					.attr("action","GetReplay.php")
+					.attr("enctype","multipart/form-data")
+					.css({
+						"margin-bottom" : "0px"
+					})
+			;
+			var input =
+				$(document.createElement("input"))
+					.attr("type","file")
+					.attr("name","upload_replay_file")
+					.attr("accept",".osr")
+					.css({
+						"width" : "400px"
+					})
+			;
+			
+			form.append(input);
+			div.append(form);
+			
+			return { element: div, value: input };
+		};
+		
+		function generateSampleSkins() {
+			var sample_skins = [
+				{
+					name : "funnytrees skin mix",
+					skin : "Skins/funnytrees - view/"
+				},
+				{
+					name : "[Nightcore HD] Lite",
+					skin : "Skins/[Nightcore HD] Lite/"
+				},
+				/*{
+					name : "osu! default",
+					skin : "Skins/default/"
+				},*/
+			];
+			
+			var div =
+				$(document.createElement("div"))
+					.append(
+						$(document.createElement("div"))
+						.css(labelcss)
+						.html("Sample Skins:")
+					)
+			;
+			var select =
+				$(document.createElement("select"))
+			;
+			var samples = [];
+			
+			for (var i=0; i<sample_skins.length; i++) {
+				var opt = document.createElement("option");
+				opt.value = sample_skins[i].skin;
+				opt.innerHTML = sample_skins[i].name;
+				
+				samples.push(opt);
+			}
+			
+			select.append(samples);
+			div.append(select);
+			
+			return { element: div,value: select };
+		};
+		
+		function generateURLSkin() {
+			var div =
+				$(document.createElement("div"))
+					.append(
+						$(document.createElement("div"))
+						.css(labelcss)
+						.html("OR by URL:")
+					)
+			;
+			var input =
+				$(document.createElement("input"))
+					.attr("type","text")
+					.css({
+						"width": "400px",
+					})
+			;
+			
+			div.append(input);
+			
+			return { element: div, value: input };
+		};
+		
+		function generateLayerOptions() {
+			var div =
+				$(document.createElement("div"))
+			;
+			var storyboardLayer =
+				$(document.createElement("input"))
+					.attr("type","checkbox")
+					.attr("checked","true")
+			;
+			var gameplayLayer =
+				$(document.createElement("input"))
+					.attr("type","checkbox")
+					.attr("checked","true")
+			;
+			var replayLayer =
+				$(document.createElement("input"))
+					.attr("type","checkbox")
+					.attr("checked","true")
+			;
+			var uiLayer =
+				$(document.createElement("input"))
+					.attr("type","checkbox")
+					.attr("checked","true")
+			;
+			var statisticsLayer =
+				$(document.createElement("input"))
+					.attr("type","checkbox")
+			;
+			
+			div.append([
+				$(document.createElement("label"))
+					.append(storyboardLayer)
+					.append("Storyboard Layer"),"<br />",
+				$(document.createElement("label"))
+					.append(gameplayLayer)
+					.append("Gameplay Layer"),"<br />",
+				$(document.createElement("label"))
+					.append(replayLayer)
+					.append("Replay Layer"),"<br />",
+				$(document.createElement("label"))
+					.append(uiLayer)
+					.append("UI Layer"),"<br />",
+				$(document.createElement("label"))
+					.append(statisticsLayer)
+					.append("Statistics Layer"),"<br />"
+			]);
+			
+			var layers = {
+				storyboard : storyboardLayer,
+				gameplay   : gameplayLayer,
+				replay     : gameplayLayer,
+				ui         : uiLayer,
+				statistics : statisticsLayer
+			};
+			
+			return { element: div, value: layers };
+		};
+		
+		function generateURLAPI() {
+			var div =
+				$(document.createElement("div"))
+					.append(
+						$(document.createElement("div"))
+						.css(labelcss)
+						.html("URL:")
+					)
+			;
+			var input =
+				$(document.createElement("input"))
+					.attr("type","text")
+					.val("http://localhost:9678")
+					.css({
+						"width": "400px",
+					})
+			;
+			
+			div.append(input);
+			
+			return { element: div, value: input };
+		}
+		
+		var replaySelect = generateSampleReplays();
+		var replayURL = generateURLReplay();
+		var replayUpload = generateUploadReplay();
+		
+		var skinSelect = generateSampleSkins();
+		var skinURL = generateURLSkin();
+		
+		var replayError =
+			$(document.createElement("div"))
+				.css(errorcss)
+		;
+		var replayWindow =
+			$(document.createElement("div"))
+				.css(wincss)
+				.append(
+					["<center><h1>Replay Selection</h1></center>"]
+					
+					.concat(replayError)
+					
+					.concat("<h2>Select a Replay File</h2>")
+					.concat(replaySelect.element)
+					.concat(replayURL.element)
+					.concat(replayUpload.element)
+					.concat("<br />")
+					
+					.concat("<h2>Select a Skin</h2>")
+					.concat(skinSelect.element)
+					.concat(skinURL.element)
+					.concat("<br />")
+				)
+		;
+		replayWindow.error = replayError;
+		
+		var optionLayers = generateLayerOptions();
+		
+		var optionError =
+			$(document.createElement("div"))
+				.css(errorcss)
+		;
+		
+		var apiURL = generateURLAPI();
+		
+		var optionWindow =
+			$(document.createElement("div"))
+				.css(wincss)
+				.append(
+					["<center><h1>Options Selection</h1></center>"]
+					
+					.concat(optionError)
+					
+					.concat("<h2>Layers</h2>")
+					.concat(optionLayers.element)
+					.concat("<br />")
+					
+					.concat("<h2>API</h2>")
+					.concat(apiURL.element)
+					.concat("<br />")
+				)
+		;
+		optionWindow.error = optionError;
+		
+		replayWindow.hide();
+		optionWindow.hide();
+		
+		dmenu.append(replayWindow);
+		dmenu.append(optionWindow);
+		
+		options.replayWindow = replayWindow;
+		options.replaySelect = replaySelect;
+		options.replayURL    = replayURL;
+		options.replayUpload = replayUpload;
+		options.skinSelect   = skinSelect;
+		options.skinURL      = skinURL;
+		options.apiURL       = apiURL;
+		
+		options.optionWindow = optionWindow;
+		options.optionLayers = optionLayers;
+		options.dmenu = dmenu;
+	};
+	
+	// Elements
+	var progresscss,progressWindow,progressStati,gameWindow;
+	{
+		progresscss = {
+			"width" : "600px",
+		};
+		
+		progressWindow =
+			$(document.createElement("div"))
+				.css({
+					"position"         : "absolute",
+					"top"              : "40px",
+					"left"             : "50%",
+					
+					"width"            : "640px",
+					"padding"          : "10px",
+					"margin-left"      : "-330px",
+					
+					"background-color" : "white",
+					"border-radius"    : "10px",
+					"z-index"          : "11",
+					
+					"font-family"      : "'Ubuntu',sans serif",
+					"font-size"        : "24px",
+				})
+		;
+		
+		gameWindow =
+			$(document.createElement("div"))
+				.css({
+					"position"         : "absolute",
+					"top"              : "0px",
+					"left"             : "0px",
+					
+					"width"            : "100%",
+					"height"           : "100%",
+					
+					"background-color" : "black",
+					"z-index"          : "10",
+				})
+		;
+		
+		dgame.fadeOut(0);
+		
+		progressStati = {
+			"Beatmap" :
+				$(document.createElement("div"))
+					.css(progresscss)
+					.html("&nbsp;"),
+			"Skin"    :
+				$(document.createElement("div"))
+					.css(progresscss)
+					.html("&nbsp;"),
+			"Replay"  :
+				$(document.createElement("div"))
+					.css(progresscss)
+					.html("&nbsp;"),
+			"Audio"   :
+				$(document.createElement("div"))
+					.css(progresscss)
+					.html("&nbsp;"),
+			"Three"   :
+				$(document.createElement("div"))
+					.css(progresscss)
+					.html("&nbsp;")
+		};
+		
+		progressWindow.append([
+			$(document.createElement("div"))
+				.css(labelcss)
+				.text("Beatmap:"),
+			progressStati["Beatmap"],
+			
+			$(document.createElement("div"))
+				.css(labelcss)
+				.text("Skin:"),
+			progressStati["Skin"],
+			
+			$(document.createElement("div"))
+				.css(labelcss)
+				.text("Replay:"),
+			progressStati["Replay"],
+			
+			$(document.createElement("div"))
+				.css(labelcss)
+				.text("Audio:"),
+			progressStati["Audio"],
+			
+			$(document.createElement("div"))
+				.css(labelcss)
+				.text("Three:"),
+			progressStati["Three"],
+		]);
+		
+		dgame.append(progressWindow);
+		dgame.append(gameWindow);
+		
+		options.progressWindow = progressWindow;
+		options.progressStati = progressStati;
+		options.gameWindow = gameWindow;
+		options.dgame = dgame;
+	}
+	
+	// Handlers
+	{
+		function toggleBlur(to) {
+			return function() {
+				$(this).animate({ "box-shadow-blur-radius": to + "px" },{
+					duration: 250,
+					step: function(amt) {
+						$(this).css("box-shadow","0px 0px " + amt + "px #FFFFFF");
+					}
+				});
+			};
+		};
+		
+		function errorHandler(errorWindow,message) {
+			hideWindow(replayWindow);
+			hideWindow(optionWindow);
+			var targetWindow = [replayWindow,optionWindow][errorWindoww];
+			showWindow(targetWindow);
+			targetWindow.error.text(message);
+		};
+		
+		replaySelector.hover(toggleBlur(20),toggleBlur(10));
+		optionSelector.hover(toggleBlur(20),toggleBlur(10));
+		submitSelector.hover(toggleBlur(20),toggleBlur(10));
+		
+		function hideWindow(w) {
+			w.hide(200);
+		};
+		
+		function showWindow(w) {
+			w.toggle(200);
+		};
+		
+		replaySelector.click(function() {
+			hideWindow(optionWindow);
+			showWindow(replayWindow);
+		});
+		optionSelector.click(function() {
+			hideWindow(replayWindow);
+			showWindow(optionWindow);
+		});
+		submitSelector.click(ORV.debug.init = function() {
+			hideWindow(replayWindow);
+			hideWindow(optionWindow);
+			dmenu.fadeOut(200);
+			dgame.fadeIn(200);
+			initGame(options,errorHandler);
+		});
+	};
+	
+});
+
+function showProgress(type,message) {
+	if (message.trim().length==0) message = "&nbsp;";
+	var target = ORV.options.progressStati[type];
+	if (target) {
+		target.html(message);
+	}
+}
+
+function showCompletion() {
+	console.log("Completed");
+	
+	WOsu.async(function() {
+		ORV.options.progressWindow.fadeOut(200);
+		
+		WOsu.async(function() {
+			ORV.player.play();
+		},500);
+		
+	},1000);
+}
+
+function showError(type,message) {
+	console.log(type + ": " + message);
+}
+
+function initGame(options,errorCallback) {
+	if (options==null) {
+		errorCallback(0,"Something wrong happened...");
+	}
+	
+	var sample_prefix =
+		location.protocol + "//" +
+		location.hostname + ":" +
+		(location.port || 80) +
+		location.pathname.substring(0,location.pathname.lastIndexOf("/")+1);
+	
+	ORV.options = options;
+	
+	var api = options.apiURL.value[0].value;
+	
+	var replayType =
+		(options.replayUpload.value[0].value=="") ? "url" : "file";
+	
+	var replayData =
+		(replayType=="file")
+			? options.replayUpload.value[0].value
+			: (options.replayURL.value[0].value
+				? options.replayURL.value[0].value
+				: sample_prefix + options.replaySelect.value[0].value);
+	
+	var skinData =  
+		(options.skinURL.value[0].value=="")
+			? options.skinSelect.value[0].value
+			: options.skinURL.value[0].value;
+	
+	var layers = {
+		storyboard : options.optionLayers.value.storyboard[0].checked,
+		gameplay   : options.optionLayers.value.gameplay[0].checked,
+		replay     : options.optionLayers.value.replay[0].checked,
+		ui         : options.optionLayers.value.ui[0].checked,
+		stat       : options.optionLayers.value.statistics[0].checked,
+	};
+	
+	WOsu.async(function() {
+		ORV.player.load({
+			api    : api,
+			layers : layers,
+			replay : { type : replayType, data : replayData },
+			skin   : skinData
+		});
+		
+		options.gameWindow.html("");
+		options.gameWindow.append(ORV.player.elements.three);
+	});
+}
+</script>
+
+<!-- Part 3: best_fail_ -->
+
+</body>
+</html>

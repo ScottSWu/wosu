@@ -1,0 +1,43 @@
+@font-face {
+	font-family: 'Ubuntu';
+	font-style: normal;
+	font-weight: 400;
+	src: local('Ubuntu'), url('lib/ext/ubuntu_googlefonts.woff') format('woff');
+}
+
+body {
+	background-color: #0988FF;
+	background-image: url('images/title_background.png');
+	background-position: center;
+	background-size: cover;
+	
+	margin: 0px;
+	padding: 0px;
+	overflow: hidden;
+	
+	font-family: 'Ubuntu';
+}
+
+h1 {
+	font-size: 22px;
+	font-weight: normal;
+	text-decoration: underline;
+	
+	margin: 5px;
+}
+
+h2 {
+	font-size: 18px;
+	font-weight: bold;
+	
+	margin: 5px;
+}
+
+.label {
+	width: 140px;
+	float: left;
+}
+
+input {
+	margin-left: 2px;
+}
