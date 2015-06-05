@@ -11,41 +11,14 @@ https://osu.ppy.sh/u/1926088
 <link type="text/css" href="main.css" rel="stylesheet" />
 <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 
-<script type="text/javascript" src="lib/ext/base64.js"></script>
-<script type="text/javascript" src="lib/ext/three.min.js"></script>
-<script type="text/javascript" src="lib/ext/jquery.min.js"></script>
-<script type="text/javascript" src="lib/ext/jquery-ui.min.js"></script>
-<script type="text/javascript" src="lib/ext/json.js"></script>
-<script type="text/javascript" src="lib/ext/lzma.min.js"></script>
+<script type="text/javascript" src="ext/base64.js"></script>
+<script type="text/javascript" src="ext/three.min.js"></script>
+<script type="text/javascript" src="ext/jquery.min.js"></script>
+<script type="text/javascript" src="ext/jquery-ui.min.js"></script>
+<script type="text/javascript" src="ext/json.js"></script>
+<script type="text/javascript" src="ext/lzma.min.js"></script>
+<script type="text/javascript" src="ext/WOsu.js"></script>
 
-<script type="text/javascript" src="lib/WOsu.js"></script>
-<!--
--->
-<script type="text/javascript" src="lib/WOsuData.js"></script>
-<!--
-<script type="text/javascript" src="lib/beatmap/Beatmap.js"></script>
-<script type="text/javascript" src="lib/beatmap/BeatmapLoader.js"></script>
-<script type="text/javascript" src="lib/beatmap/BeatmapData.js"></script>
-<script type="text/javascript" src="lib/beatmap/BeatmapEvents.js"></script>
-<script type="text/javascript" src="lib/beatmap/BeatmapObjects.js"></script>
-<script type="text/javascript" src="lib/beatmap/BeatmapMechanics.js"></script>
-<script type="text/javascript" src="lib/event/Event.js"></script>
-<script type="text/javascript" src="lib/event/BackgroundEvent.js"></script>
-<script type="text/javascript" src="lib/event/BreakPeriod.js"></script>
-<script type="text/javascript" src="lib/event/StoryboardEvent.js"></script>
-<script type="text/javascript" src="lib/event/StoryboardObject.js"></script>
-<script type="text/javascript" src="lib/event/TimingPoint.js"></script>
-<script type="text/javascript" src="lib/event/ColourEvent.js"></script>
-<script type="text/javascript" src="lib/object/HitObject.js"></script>
-<script type="text/javascript" src="lib/object/SliderObject.js"></script>
-<script type="text/javascript" src="lib/object/SpinnerObject.js"></script>
-<script type="text/javascript" src="lib/player/Player.js"></script>
-<script type="text/javascript" src="lib/skin/Skin.js"></script>
-<script type="text/javascript" src="lib/skin/SkinLoader.js"></script>
-<script type="text/javascript" src="lib/replay/Replay.js"></script>
-<script type="text/javascript" src="lib/replay/ReplayLoader.js"></script>
-<script type="text/javascript" src="lib/math/Matrix3.js"></script>
-<!-- -->
 </head>
 <body>
 <script>
@@ -60,6 +33,7 @@ https://osu.ppy.sh/u/1926088
 <script type="text/javascript">
 var ORV = {};
 
+// Entrypoint
 $(document).ready(function() {
 	// These brackets make collapsing levels easier
 	var dmenu,dgame;
@@ -230,15 +204,16 @@ $(document).ready(function() {
 					replay : "",
 				},*/
 				{
+					player : "mugio3",
+					map    : "An - artcore JINJA [Skystar]",
+					replay : "Replays/mugio3 - An - artcore JINJA [Skystar] (2013-09-12) Osu - DefaultGood.osr",
+				},
+				{
 					player : "SapphireGhost",
 					map    : "Xelia - Illumiscape (Kanna) [Extra]",
 					replay : "Replays/SapphireGhost - Xelia - Illumiscape [Extra] (2013-05-28) Osu.osr.json",
 				},
-				{
-					player : "Cookiezi",
-					map    : "xi - FREEDOM DiVE (Nakagawa-Kanon) [FOUR DIMENSIONS]",
-					replay : "Replays/Cookiezi - xi - FREEDOM DiVE [FOUR DIMENSIONS] (2013-02-02) Osu.osr.json",
-				},
+				/*
 				{
 					player : "funnytrees",
 					map    : "Solid Inc. - What I Found (State Function Remix) (galvenize) [New Day]",
@@ -254,7 +229,7 @@ $(document).ready(function() {
 					map    : "momori - Togameru Kage (cRyo[iceeicee]) [Insane]",
 					replay : "Replays/funnytrees - momori - Togameru Kage [Insane] (2013-12-10) Osu.osr.json"
 				},
-				/*{
+				{
 					player : "funnytrees",
 					map    : "nano - magenta (LunarSakuya) [Hard]",
 					replay : "Replays/funnytrees - nano - magenta [Hard] (2013-11-25) Osu.osr.json"
@@ -730,6 +705,7 @@ $(document).ready(function() {
 	
 });
 
+// Show the current loading progress
 function showProgress(type,message) {
 	if (message.trim().length==0) message = "&nbsp;";
 	var target = ORV.options.progressStati[type];
@@ -738,6 +714,7 @@ function showProgress(type,message) {
 	}
 }
 
+// Show the completion animation
 function showCompletion() {
 	console.log("Completed");
 	
@@ -751,10 +728,12 @@ function showCompletion() {
 	},1000);
 }
 
+// Show the error
 function showError(type,message) {
 	console.log(type + ": " + message);
 }
 
+// Initialize the game with the given options
 function initGame(options,errorCallback) {
 	if (options==null) {
 		errorCallback(0,"Something wrong happened...");

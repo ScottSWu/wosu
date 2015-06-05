@@ -1,6 +1,8 @@
 wosu
 ====
 
+TODO Clean up and update with new goals.
+
 Web osu! library
 
 This is a library based off of jQuery, three.js and lzma.js for reading and displaying osu! related files.
