@@ -1,527 +1,571 @@
 String.prototype.startsWith = function(str) {
-	return this.slice(0,str.length)==str;
+    return this.slice(0, str.length) == str;
 }
 
 String.prototype.endsWith = function(str) {
-	return this.slice(-str.length)==str;
+    return this.slice(-str.length) == str;
 }
 
-var $$ = function(id) { return document.getElementById(id); }
-
-WOsu = function() {
+var $$ = function(id) {
+    return document.getElementById(id);
 }
+
+WOsu = function() {}
 
 WOsu.prototype.contructor = WOsu;
 
+// Beatmap API location
 WOsu.API = "http://sc-wu.com:9678";
 
+// Shader to support the alpha channel
 WOsu.alphaShader = {
-	vertexShader : [
-		"varying vec2 vUv;",
-		"attribute vec4 wosuColor;",
-		"varying vec4 vColor;",
+    vertexShader: [
+        "attribute vec4 wosuColor;",
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
 
-		"void main() {",
-		"	vColor = wosuColor;",
-		"	vUv = uv;",
-		"	gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);",
-		"}"
-	].join("\n"),
+        "void main() {",
+        "	vColor = wosuColor;",
+        // TODO abuse built in colors normals and use "vColor = vec4(color, normal.x);"
+        "	vUv = uv;",
+        "	gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "}"
+    ].join("\n"),
 
-	fragmentShader : [
-		"uniform sampler2D texture;",
-		"varying vec4 vColor;",
-		"varying vec2 vUv;",
+    fragmentShader: [
+        "uniform sampler2D texture;",
+        "varying vec4 vColor;",
+        "varying vec2 vUv;",
 
-		"void main() {",
-		"	gl_FragColor = texture2D(texture, vUv) * vColor;",
-		"}"
-	].join("\n"),
-	
-	blending : THREE.NormalBlending
+        "void main() {",
+        "	gl_FragColor = texture2D(texture, vUv) * vColor;",
+        "}"
+    ].join("\n"),
+
+    blending: THREE.NormalBlending
 };
 
-WOsu.async = function(func,t) {
-	setTimeout(func,t || 5);
+/*
+    Asynchronously call a function.
+ */
+WOsu.async = function(func, t) {
+    setTimeout(func, t || 5);
+}
+
+/*
+    Asynchronously call multiple functions with a callback when all functions finish.
+    The first parameter is the calling instance. The second parameter is an array of functions
+    and arguments. The third parameter is the final callback when all functions are finished.
+ */
+WOsu.resync = function(instance, funcs, callback) {
+    var count = 0;
+    var total = funcs.length;
+    var finish = function() {
+        count++;
+        if (count >= total) {
+            callback();
+        }
+    };
+    
+    funcs.map(function(o) {
+        WOsu.async(function() {
+            o.args.unshift(finish);
+            o.fn.apply(instance, o.args);
+        });
+    });
 }
 
 // ==== Creation functions =====
 
-WOsu.create_beat = function(cobj,offset,color,mechanics,textures) {
-	var vecColor = new THREE.Vector4(color[0],color[1],color[2],0);
-	var vecWhite = new THREE.Vector4(1,1,1,0);
-	var objs = {};
-	
-	objs._main = new THREE.Object3D();
-	objs._main.position.set(cobj.x+offset.x-256,192-cobj.y-offset.y,offset.z);
-	
-	objs.hitcircle = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0,
-		size : mechanics.CS*0.95,
-		color : vecColor,
-		texture : textures.hitcircle
-	});
-	
-	objs.hitcircle_overlay = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.1,
-		size : mechanics.CS,
-		color : vecWhite,
-		texture : textures.hitcircle_overlay
-	});
-	
-	objs.approachcircle = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.3,
-		size : mechanics.CS,
-		color : vecColor,
-		texture : textures.approachcircle
-	});
-	
-	objs._lighting = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.2,
-		size : mechanics.CS,
-		color : vecColor,
-		texture : textures.lighting
-	});
-	
-	WOsu.create_number_meshes({
-		object : objs,
-		number : cobj.comboNumber,
-		x : 0,
-		y : 0,
-		z : 0.2,
-		size : mechanics.CS/2,
-		color : vecWhite,
-		textures : textures,
-		prefix : "default"
-	});
-	
-	objs.approachcircle.scale.set(3,3,1);
-	
-	for (var i in objs) if (i!="_main") objs._main.add(objs[i]);
-	
-	return objs;
+WOsu.create_beat = function(cobj, offset, color, mechanics, textures) {
+    var vecColor = new THREE.Vector4(color[0], color[1], color[2], 0);
+    var vecWhite = new THREE.Vector4(1, 1, 1, 0);
+    var objs = {};
+
+    objs._main = new THREE.Object3D();
+    objs._main.position.set(cobj.x + offset.x - 256, 192 - cobj.y - offset.y, offset.z);
+
+    objs.hitcircle = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0,
+        size: mechanics.CS * 0.95,
+        color: vecColor,
+        texture: textures.hitcircle
+    });
+
+    objs.hitcircle_overlay = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.1,
+        size: mechanics.CS,
+        color: vecWhite,
+        texture: textures.hitcircle_overlay
+    });
+
+    objs.approachcircle = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.3,
+        size: mechanics.CS,
+        color: vecColor,
+        texture: textures.approachcircle
+    });
+
+    objs._lighting = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.2,
+        size: mechanics.CS,
+        color: vecColor,
+        texture: textures.lighting
+    });
+
+    WOsu.create_number_meshes({
+        object: objs,
+        number: cobj.comboNumber,
+        x: 0,
+        y: 0,
+        z: 0.2,
+        size: mechanics.CS / 2,
+        color: vecWhite,
+        textures: textures,
+        prefix: "default"
+    });
+
+    objs.approachcircle.scale.set(3, 3, 1);
+
+    for (var i in objs)
+        if (i != "_main") objs._main.add(objs[i]);
+
+    return objs;
 }
 
-WOsu.create_slider = function(cobj,offset,color,mechanics,textures) {
-	var vecColor = new THREE.Vector4(color[0],color[1],color[2],0);
-	var vecWhite = new THREE.Vector4(1,1,1,0);
-	var objs = {};
-	
-	cobj.generateBezier();
-	
-	objs._main = new THREE.Object3D();
-	objs._main.position.set(cobj.x+offset.x-256,192-cobj.y-offset.y,offset.z);
-	
-	objs.hitcircle = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0,
-		size : mechanics.CS*0.95,
-		color : vecColor,
-		texture : textures.hitcircle
-	});
-	
-	objs.hitcircle_overlay = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.1,
-		size : mechanics.CS,
-		color : vecWhite,
-		texture : textures.hitcircle_overlay
-	});
-	
-	objs.hitcircle_repeat = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.15,
-		size : mechanics.CS,
-		color : vecWhite,
-		texture : textures.reversearrow
-	});
-	
-	objs.approachcircle = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.3,
-		size : mechanics.CS,
-		color : vecColor,
-		texture : textures.approachcircle
-	});
-	
-	objs.endcircle = WOsu.create_quad_mesh({
-		x :  cobj.endX-cobj.x,
-		y : -cobj.endY+cobj.y,
-		z : -0.2,
-		size : mechanics.CS*0.95,
-		color : vecColor,
-		texture : textures.hitcircle
-	});
-	
-	objs.endcircle_overlay = WOsu.create_quad_mesh({
-		x :  cobj.endX-cobj.x,
-		y : -cobj.endY+cobj.y,
-		z : -0.1,
-		size : mechanics.CS,
-		color : vecWhite,
-		texture : textures.hitcircle_overlay
-	});
-	
-	objs.endcircle_repeat = WOsu.create_quad_mesh({
-		x :  cobj.endX-cobj.x,
-		y : -cobj.endY+cobj.y,
-		z : -0.05,
-		size : mechanics.CS,
-		color : vecWhite,
-		texture : textures.reversearrow
-	});
-	
-	objs.slider = WOsu.create_curve_mesh({
-		x : 0,
-		y : 0,
-		z : -0.4,
-		size : mechanics.CS/2*0.95,
-		color : vecColor,
-		texture : textures.hitcircle,
-		object : cobj
-	});
-	
-	objs.slider_overlay = WOsu.create_curve_mesh({
-		x : 0,
-		y : 0,
-		z : -0.3,
-		size : mechanics.CS/2,
-		color : vecWhite,
-		texture : textures.hitcircle_overlay,
-		object : cobj
-	});
-	
-	objs.slider_ball = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.3,
-		size : mechanics.CS,
-		color : vecWhite,
-		texture : textures.slider_b
-	});
-	
-	objs.slider_follow = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.35,
-		size :mechanics.CS*2,
-		color : vecWhite,
-		texture : textures.slider_followcircle
-	});
-	
-	objs._lighting = WOsu.create_quad_mesh({
-		x : (cobj.repeats%2==0) ?  cobj.endX-cobj.x : 0,
-		y : (cobj.repeats%2==0) ? -cobj.endY+cobj.y : 0,
-		z : 0.2,
-		size : mechanics.CS,
-		color : vecColor,
-		texture : textures.lighting
-	});
-	
-	WOsu.create_number_meshes({
-		object : objs,
-		number : cobj.comboNumber,
-		x : 0,
-		y : 0,
-		z : 0.2,
-		size : mechanics.CS/2,
-		color : vecWhite,
-		textures : textures,
-		prefix : "default"
-	});
-	
-	objs.approachcircle.scale.set(3,3,1);
-	objs.hitcircle_repeat.visible = false;
-	objs.endcircle_repeat.visible = false;
-	
-	for (var i in objs) if (i!="_main") objs._main.add(objs[i]);
-	
-	return objs;
+WOsu.create_slider = function(cobj, offset, color, mechanics, textures) {
+    var vecColor = new THREE.Vector4(color[0], color[1], color[2], 0);
+    var vecWhite = new THREE.Vector4(1, 1, 1, 0);
+    var objs = {};
+
+    cobj.generateBezier();
+
+    objs._main = new THREE.Object3D();
+    objs._main.position.set(cobj.x + offset.x - 256, 192 - cobj.y - offset.y, offset.z);
+
+    objs.hitcircle = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0,
+        size: mechanics.CS * 0.95,
+        color: vecColor,
+        texture: textures.hitcircle
+    });
+
+    objs.hitcircle_overlay = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.1,
+        size: mechanics.CS,
+        color: vecWhite,
+        texture: textures.hitcircle_overlay
+    });
+
+    objs.hitcircle_repeat = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.15,
+        size: mechanics.CS,
+        color: vecWhite,
+        texture: textures.reversearrow
+    });
+
+    objs.approachcircle = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.3,
+        size: mechanics.CS,
+        color: vecColor,
+        texture: textures.approachcircle
+    });
+
+    objs.endcircle = WOsu.create_quad_mesh({
+        x: cobj.endX - cobj.x,
+        y: -cobj.endY + cobj.y,
+        z: -0.2,
+        size: mechanics.CS * 0.95,
+        color: vecColor,
+        texture: textures.hitcircle
+    });
+
+    objs.endcircle_overlay = WOsu.create_quad_mesh({
+        x: cobj.endX - cobj.x,
+        y: -cobj.endY + cobj.y,
+        z: -0.1,
+        size: mechanics.CS,
+        color: vecWhite,
+        texture: textures.hitcircle_overlay
+    });
+
+    objs.endcircle_repeat = WOsu.create_quad_mesh({
+        x: cobj.endX - cobj.x,
+        y: -cobj.endY + cobj.y,
+        z: -0.05,
+        size: mechanics.CS,
+        color: vecWhite,
+        texture: textures.reversearrow
+    });
+
+    objs.slider = WOsu.create_curve_mesh({
+        x: 0,
+        y: 0,
+        z: -0.4,
+        size: mechanics.CS / 2 * 0.95,
+        color: vecColor,
+        texture: textures.hitcircle,
+        object: cobj
+    });
+
+    objs.slider_overlay = WOsu.create_curve_mesh({
+        x: 0,
+        y: 0,
+        z: -0.3,
+        size: mechanics.CS / 2,
+        color: vecWhite,
+        texture: textures.hitcircle_overlay,
+        object: cobj
+    });
+
+    objs.slider_ball = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.3,
+        size: mechanics.CS,
+        color: vecWhite,
+        texture: textures.slider_b
+    });
+
+    objs.slider_follow = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.35,
+        size: mechanics.CS * 2,
+        color: vecWhite,
+        texture: textures.slider_followcircle
+    });
+
+    objs._lighting = WOsu.create_quad_mesh({
+        x: (cobj.repeats % 2 == 0) ? cobj.endX - cobj.x : 0,
+        y: (cobj.repeats % 2 == 0) ? -cobj.endY + cobj.y : 0,
+        z: 0.2,
+        size: mechanics.CS,
+        color: vecColor,
+        texture: textures.lighting
+    });
+
+    WOsu.create_number_meshes({
+        object: objs,
+        number: cobj.comboNumber,
+        x: 0,
+        y: 0,
+        z: 0.2,
+        size: mechanics.CS / 2,
+        color: vecWhite,
+        textures: textures,
+        prefix: "default"
+    });
+
+    objs.approachcircle.scale.set(3, 3, 1);
+    objs.hitcircle_repeat.visible = false;
+    objs.endcircle_repeat.visible = false;
+
+    for (var i in objs)
+        if (i != "_main") objs._main.add(objs[i]);
+
+    return objs;
 }
 
-WOsu.create_spinner = function(cobj,offset,color,mechanics,textures) {
-	var vecWhite = new THREE.Vector4(1,1,1,0);
-	var objs = {};
-	
-	objs._main = new THREE.Object3D();
-	objs._main.position.set(cobj.x-256,192-cobj.y,offset.z);
-	
-	objs.spinner_background = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0,
-		width : 640,
-		height : 480,
-		color : vecWhite,
-		texture : textures.spinner_background
-	});
-	
-	objs.spinner_circle = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.1,
-		size : 480,
-		color : vecWhite,
-		texture : textures.spinner_circle
-	});
-	
-	objs.spinner_metre = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.2,
-		width : 640,
-		height : 480,
-		color : vecWhite,
-		texture : textures.spinner_metre
-	});
-	
-	objs.spinner_approachcircle = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.3,
-		size : 480,
-		color : vecWhite,
-		texture : textures.spinner_approachcircle
-	});
-	
-	objs._lighting = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0.2,
-		size : mechanics.CS,
-		color : vecWhite,
-		texture : textures.lighting
-	});
-	
-	//objs._main.add(objs.spinner_background);
-	objs._main.add(objs.spinner_circle);
-	//objs._main.add(objs.spinner_metre);
-	objs._main.add(objs.spinner_approachcircle);
-	objs._main.add(objs._lighting);
-	//for (var i in objs) if (i!="_main") objs._main.add(objs[i]);
-	
-	return objs;
+WOsu.create_spinner = function(cobj, offset, color, mechanics, textures) {
+    var vecWhite = new THREE.Vector4(1, 1, 1, 0);
+    var objs = {};
+
+    objs._main = new THREE.Object3D();
+    objs._main.position.set(cobj.x - 256, 192 - cobj.y, offset.z);
+
+    objs.spinner_background = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0,
+        width: 640,
+        height: 480,
+        color: vecWhite,
+        texture: textures.spinner_background
+    });
+
+    objs.spinner_circle = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.1,
+        size: 480,
+        color: vecWhite,
+        texture: textures.spinner_circle
+    });
+
+    objs.spinner_metre = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.2,
+        width: 640,
+        height: 480,
+        color: vecWhite,
+        texture: textures.spinner_metre
+    });
+
+    objs.spinner_approachcircle = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.3,
+        size: 480,
+        color: vecWhite,
+        texture: textures.spinner_approachcircle
+    });
+
+    objs._lighting = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0.2,
+        size: mechanics.CS,
+        color: vecWhite,
+        texture: textures.lighting
+    });
+
+    //objs._main.add(objs.spinner_background);
+    objs._main.add(objs.spinner_circle);
+    //objs._main.add(objs.spinner_metre);
+    objs._main.add(objs.spinner_approachcircle);
+    objs._main.add(objs._lighting);
+    //for (var i in objs) if (i!="_main") objs._main.add(objs[i]);
+
+    return objs;
 }
 
 WOsu.create_cursor = function(textures) {
-	var vecWhite = new THREE.Vector4(1,1,1,1);
-	var objs = {};
-	
-	objs._main = new THREE.Object3D();
-	objs._main.position.set(0,0,0);
-	
-	objs.cursor = WOsu.create_quad_mesh({
-		x : 0,
-		y : 0,
-		z : 0,
-		size : 32,
-		color : vecWhite,
-		texture : textures.cursor
-	});
-	
-	objs._main.add(objs.cursor);
-	
-	return objs;
+    var vecWhite = new THREE.Vector4(1, 1, 1, 1);
+    var objs = {};
+
+    objs._main = new THREE.Object3D();
+    objs._main.position.set(0, 0, 0);
+
+    objs.cursor = WOsu.create_quad_mesh({
+        x: 0,
+        y: 0,
+        z: 0,
+        size: 32,
+        color: vecWhite,
+        texture: textures.cursor
+    });
+
+    objs._main.add(objs.cursor);
+
+    return objs;
 }
 
 WOsu.create_quad_mesh = function(params) {
-	if (params.size!=undefined) {
-		params.width = params.height = params.size;
-	}
-	
-	var attributes = {
-		wosuColor : { type : 'v4' , value : [] }
-	};
-	var uniforms = {
-		texture : { type : 't' , value : params.texture }
-	};
-	var mesh = new THREE.Mesh(
-		new THREE.PlaneGeometry(params.width,params.height,1,1),
-		//new THREE.MeshBasicMaterial({ color : carr[0]*0x10000+carr[1]*0x100+carr[2] , map : WOsu.textures.skin.hitcircle , transparent : false })/*
-		new THREE.ShaderMaterial({
-			attributes : attributes,
-			uniforms : uniforms,
-			
-			vertexShader : WOsu.alphaShader.vertexShader,
-			fragmentShader : WOsu.alphaShader.fragmentShader,
-			
-			side : THREE.DoubleSide,
-			blending : WOsu.alphaShader.blending,
-			transparent : true
-		})
-		//*/
-	);
-	
-	for (var j=0; j<mesh.geometry.vertices.length; j++) {
-		attributes.wosuColor.value[j] = params.color;
-	}
-	
-	mesh.attributes = attributes;
-	mesh.uniforms = uniforms;
-	mesh.position.set(params.x,params.y,params.z);
-	
-	return mesh;
+    if (params.size != undefined) {
+        params.width = params.height = params.size;
+    }
+
+    var attributes = {
+        wosuColor: {
+            type: 'v4',
+            value: []
+        }
+    };
+    var uniforms = {
+        texture: {
+            type: 't',
+            value: params.texture
+        }
+    };
+    var mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(params.width, params.height, 1, 1),
+        //new THREE.MeshBasicMaterial({ color : carr[0]*0x10000+carr[1]*0x100+carr[2] , map : WOsu.textures.skin.hitcircle , transparent : false })/*
+        new THREE.ShaderMaterial({
+            attributes: attributes,
+            uniforms: uniforms,
+
+            vertexShader: WOsu.alphaShader.vertexShader,
+            fragmentShader: WOsu.alphaShader.fragmentShader,
+
+            side: THREE.DoubleSide,
+            blending: WOsu.alphaShader.blending,
+            transparent: true
+        })
+        //*/
+    );
+
+    for (var j = 0; j < mesh.geometry.vertices.length; j++) {
+        attributes.wosuColor.value[j] = params.color;
+    }
+
+    mesh.attributes = attributes;
+    mesh.uniforms = uniforms;
+    mesh.position.set(params.x, params.y, params.z);
+
+    return mesh;
 }
 
 WOsu.create_curve_mesh = function(params) {
-	var attributes = {
-		wosuColor : { type : 'v4' , value : [] }
-	};
-	var uniforms = {
-		texture : { type : 't' , value : params.texture }
-	};
-	var geometry = WOsu.create_curve_geometry(
-		params.object.curveX,
-		params.object.curveY,
-		params.object.x,
-		params.object.y,
-		params.size
-	);
-	var mesh = new THREE.Mesh(
-		geometry,
-		//new THREE.MeshBasicMaterial({ color : carr[0]*0x10000+carr[1]*0x100+carr[2] , map : WOsu.textures.skin.hitcircle , transparent : false })/*
-		new THREE.ShaderMaterial({
-			attributes : attributes,
-			uniforms : uniforms,
-			
-			vertexShader : WOsu.alphaShader.vertexShader,
-			fragmentShader : WOsu.alphaShader.fragmentShader,
-			
-			side : THREE.DoubleSide,
-			blending : WOsu.alphaShader.blending,
-			transparent : true
-		})
-		//*/
-	);
-	
-	for (var j=0; j<mesh.geometry.vertices.length; j++) {
-		attributes.wosuColor.value[j] = params.color;
-	}
-	
-	mesh.attributes = attributes;
-	mesh.uniforms = uniforms;
-	mesh.position.set(params.x,params.y,params.z);
-	
-	return mesh;
+    var attributes = {
+        wosuColor: {
+            type: 'v4',
+            value: []
+        }
+    };
+    var uniforms = {
+        texture: {
+            type: 't',
+            value: params.texture
+        }
+    };
+    var geometry = WOsu.create_curve_geometry(
+        params.object.curveX,
+        params.object.curveY,
+        params.object.x,
+        params.object.y,
+        params.size
+    );
+    var mesh = new THREE.Mesh(
+        geometry,
+        //new THREE.MeshBasicMaterial({ color : carr[0]*0x10000+carr[1]*0x100+carr[2] , map : WOsu.textures.skin.hitcircle , transparent : false })/*
+        new THREE.ShaderMaterial({
+            attributes: attributes,
+            uniforms: uniforms,
+
+            vertexShader: WOsu.alphaShader.vertexShader,
+            fragmentShader: WOsu.alphaShader.fragmentShader,
+
+            side: THREE.DoubleSide,
+            blending: WOsu.alphaShader.blending,
+            transparent: true
+        })
+        //*/
+    );
+
+    for (var j = 0; j < mesh.geometry.vertices.length; j++) {
+        attributes.wosuColor.value[j] = params.color;
+    }
+
+    mesh.attributes = attributes;
+    mesh.uniforms = uniforms;
+    mesh.position.set(params.x, params.y, params.z);
+
+    return mesh;
 }
 
-WOsu.create_curve_geometry = function(cx,cy,ox,oy,size) {
-	var geometry = new THREE.Geometry();
-	
-	var bisectors = new Array(cx.length-2);
-	var angle, lastAngle = undefined, offset = 0;
-	for (var i=0; i<cx.length-2; i++) {
-		var a1 = Math.atan2(cy[i+1]-cy[i],cx[i]-cx[i+1]);
-		var a2 = Math.atan2(cy[i+1]-cy[i+2],cx[i+2]-cx[i+1]);
-		var angle = (a1 + a2)/2;
-		if (lastAngle!=undefined) {
-			if (Math.abs((angle+offset-lastAngle) % (2*Math.PI))>Math.PI/2) {
-				offset += Math.PI;
-			}
-		}
-		lastAngle = angle + offset;
-		bisectors[i] = new THREE.Vector3(size*Math.cos(lastAngle),size*Math.sin(lastAngle),0);
-	}
-	
-	var bisector,lastb = bisectors[0],winding = false;
-	var offset = new THREE.Vector3(0,size,0);
-	for (var i=0; i<cx.length; i++) {
-		if (i==0) bisector = bisectors[0];
-		else if (i==cx.length-1) bisector = bisectors[i-2];
-		else bisector = bisectors[i-1];
-		
-		var curve = new THREE.Vector3(cx[i]-ox,oy-cy[i],0);
-		
-		geometry.vertices.push(curve.clone().add(bisector));
-		geometry.vertices.push(curve.clone().sub(bisector));
-	}
-	
-	var normal = new THREE.Vector3(0,0,1);
-	var uvl = new THREE.Vector2(0.5,0);
-	var uvr = new THREE.Vector2(0.5,1);
-	var face;
-	for (var i=0; i<cx.length-1; i++) {
-		face = new THREE.Face3(2*i  ,2*i+1,2*i+2);
-		face.normal.copy(normal);
-		face.vertexNormals.push(normal.clone(),normal.clone(),normal.clone());
-		
-		geometry.faces.push(face);
-		geometry.faceVertexUvs[0].push([uvl.clone(),uvr.clone(),uvl.clone()]);
-		
-		face = new THREE.Face3(2*i+1,2*i+2,2*i+3);
-		face.normal.copy(normal);
-		face.vertexNormals.push(normal.clone(),normal.clone(),normal.clone());
-		
-		geometry.faces.push(face);
-		geometry.faceVertexUvs[0].push([uvr.clone(),uvl.clone(),uvr.clone()]);
-	}
-	
-	geometry.computeCentroids();
-	geometry.computeBoundingBox();
-	
-	return geometry;
+WOsu.create_curve_geometry = function(cx, cy, ox, oy, size) {
+    var geometry = new THREE.Geometry();
+
+    var bisectors = new Array(cx.length - 2);
+    var angle, lastAngle = undefined,
+        offset = 0;
+    for (var i = 0; i < cx.length - 2; i++) {
+        var a1 = Math.atan2(cy[i + 1] - cy[i], cx[i] - cx[i + 1]);
+        var a2 = Math.atan2(cy[i + 1] - cy[i + 2], cx[i + 2] - cx[i + 1]);
+        var angle = (a1 + a2) / 2;
+        if (lastAngle != undefined) {
+            if (Math.abs((angle + offset - lastAngle) % (2 * Math.PI)) > Math.PI / 2) {
+                offset += Math.PI;
+            }
+        }
+        lastAngle = angle + offset;
+        bisectors[i] = new THREE.Vector3(size * Math.cos(lastAngle), size * Math.sin(lastAngle), 0);
+    }
+
+    var bisector, lastb = bisectors[0],
+        winding = false;
+    var offset = new THREE.Vector3(0, size, 0);
+    for (var i = 0; i < cx.length; i++) {
+        if (i == 0) bisector = bisectors[0];
+        else if (i == cx.length - 1) bisector = bisectors[i - 2];
+        else bisector = bisectors[i - 1];
+
+        var curve = new THREE.Vector3(cx[i] - ox, oy - cy[i], 0);
+
+        geometry.vertices.push(curve.clone().add(bisector));
+        geometry.vertices.push(curve.clone().sub(bisector));
+    }
+
+    var normal = new THREE.Vector3(0, 0, 1);
+    var uvl = new THREE.Vector2(0.5, 0);
+    var uvr = new THREE.Vector2(0.5, 1);
+    var face;
+    for (var i = 0; i < cx.length - 1; i++) {
+        face = new THREE.Face3(2 * i, 2 * i + 1, 2 * i + 2);
+        face.normal.copy(normal);
+        face.vertexNormals.push(normal.clone(), normal.clone(), normal.clone());
+
+        geometry.faces.push(face);
+        geometry.faceVertexUvs[0].push([uvl.clone(), uvr.clone(), uvl.clone()]);
+
+        face = new THREE.Face3(2 * i + 1, 2 * i + 2, 2 * i + 3);
+        face.normal.copy(normal);
+        face.vertexNormals.push(normal.clone(), normal.clone(), normal.clone());
+
+        geometry.faces.push(face);
+        geometry.faceVertexUvs[0].push([uvr.clone(), uvl.clone(), uvr.clone()]);
+    }
+
+    geometry.computeCentroids();
+    geometry.computeBoundingBox();
+
+    return geometry;
 }
 
 WOsu.create_number_meshes = function(params) {
-	if (params.number<10) {
-		var d1 = ~~(params.number);
-		
-		var tex = params.textures[params.prefix + "_" + d1];
-		var scale = tex.image.width/tex.image.height * params.size;
-		params.object.digit1 = WOsu.create_quad_mesh({
-			x : params.x,
-			y : params.y,
-			z : params.z,
-			width : scale,
-			height: params.size,
-			color : params.color,
-			texture : tex
-		});
-	}
-	else if (params.number<100) {
-		var d1 = ~~(params.number/10);
-		var d2 = ~~(params.number%10);
-		
-		var tex1 = params.textures[params.prefix + "_" + d1];
-		var scale1 = tex1.image.width/tex1.image.height * params.size;
-		var tex2 = params.textures[params.prefix + "_" + d2];
-		var scale2 = tex2.image.width/tex2.image.height * params.size;
-		var midpoint = (scale2-scale1)/2;
-		
-		params.object.digit1 = WOsu.create_quad_mesh({
-			x : params.x - scale2/2,
-			y : params.y,
-			z : params.z,
-			width : scale1,
-			height: params.size,
-			color : params.color,
-			texture : tex1
-		});
-		
-		params.object.digit2 = WOsu.create_quad_mesh({
-			x : params.x + scale1/2,
-			y : params.y,
-			z : params.z,
-			width : scale2,
-			height: params.size,
-			color : params.color,
-			texture : tex2
-		});
-	}
-}
+    if (params.number < 10) {
+        var d1 = ~~ (params.number);
 
+        var tex = params.textures[params.prefix + "_" + d1];
+        var scale = tex.image.width / tex.image.height * params.size;
+        params.object.digit1 = WOsu.create_quad_mesh({
+            x: params.x,
+            y: params.y,
+            z: params.z,
+            width: scale,
+            height: params.size,
+            color: params.color,
+            texture: tex
+        });
+    } else if (params.number < 100) {
+        var d1 = ~~ (params.number / 10);
+        var d2 = ~~ (params.number % 10);
+
+        var tex1 = params.textures[params.prefix + "_" + d1];
+        var scale1 = tex1.image.width / tex1.image.height * params.size;
+        var tex2 = params.textures[params.prefix + "_" + d2];
+        var scale2 = tex2.image.width / tex2.image.height * params.size;
+        var midpoint = (scale2 - scale1) / 2;
+
+        params.object.digit1 = WOsu.create_quad_mesh({
+            x: params.x - scale2 / 2,
+            y: params.y,
+            z: params.z,
+            width: scale1,
+            height: params.size,
+            color: params.color,
+            texture: tex1
+        });
+
+        params.object.digit2 = WOsu.create_quad_mesh({
+            x: params.x + scale1 / 2,
+            y: params.y,
+            z: params.z,
+            width: scale2,
+            height: params.size,
+            color: params.color,
+            texture: tex2
+        });
+    }
+}
 WOsu.Beatmap = function() {
 	this.BeatmapData      = new WOsu.BeatmapData();
 	this.BeatmapEvents    = new WOsu.BeatmapEvents();
@@ -1617,763 +1661,747 @@ WOsu.SpinnerObject.prototype.parseSpinnerObject = function(line) {
 }
 /*
  * WOsu.Player
+ *
+ *
  */
 WOsu.Player = function(options) {
-	this.width = options.width || 640;
-	this.height = options.height || 480;
-	
-	this.callback = {
-		progress   : options.progressCallback,
-		completion : options.completionCallback,
-		error      : options.errorCallback
-	};
-	
-	this.skin = null;
-	this.replay = null;
-	this.beatmap = null;
-	this.game = null;
-	
-	this.elements = {
-		audio : null,
-		three : null
-	};
-	
-	// Initialize Three.js
-	this.initThree();
+    this.width = options.width || 640;
+    this.height = options.height || 480;
+
+    this.callback = {
+        progress: options.progressCallback,
+        completion: options.completionCallback,
+        error: options.errorCallback
+    };
+
+    this.skin = null;
+    this.replay = null;
+    this.beatmap = null;
+    this.game = null;
+
+    this.elements = {
+        audio: null,
+        three: null
+    };
+
+    // Initialize Three.js
+    this.initThree();
 }
 
 WOsu.Player.prototype.constructor = WOsu.Player;
 
 WOsu.Player.prototype.initThree = function() {
-	var instance = this;
-	
-	var renderer = new THREE.WebGLRenderer();
-	renderer.setSize(this.width,this.height);
-	
-	// Need to scale to at least 640 x 480 units
-	var ratio = this.height/this.width;
-	var camera;
-	if (ratio>0.75) { // Width limit
-		camera = new THREE.OrthographicCamera(-320,320,320*ratio,-320*ratio,1,1e9);
-	}
-	else { // Height limit
-		camera = new THREE.OrthographicCamera(-240/ratio,240/ratio,240,-240,1,1e9);
-	}
-	camera.position.set(0,0,2);
-	camera.lookAt(new THREE.Vector3(0,0,0));
-	
-	var light = new THREE.AmbientLight(0xFFFFFF);
-	
-	this.three = {
-		renderer : renderer,
-		camera   : camera,
-		light    : light,
-		status   : ""
-	};
-	
-	this.elements.three = renderer.domElement;
+    var instance = this;
+
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setSize(this.width, this.height);
+
+    // Need to scale to at least 640 x 480 units
+    var ratio = this.height / this.width;
+    var camera;
+    if (ratio > 0.75) { // Width limit
+        camera = new THREE.OrthographicCamera(-320, 320, 320 * ratio, -320 * ratio, 1, 1e9);
+    } else { // Height limit
+        camera = new THREE.OrthographicCamera(-240 / ratio, 240 / ratio, 240, -240, 1, 1e9);
+    }
+    camera.position.set(0, 0, 2);
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    var light = new THREE.AmbientLight(0xFFFFFF);
+
+    this.three = {
+        renderer: renderer,
+        camera: camera,
+        light: light,
+        status: ""
+    };
+
+    this.elements.three = renderer.domElement;
 }
 
 WOsu.Player.prototype.load = function(options) {
-	var instance = this;
-	
-	this.loaded = false;
-	this.playing = false;
-	
-	this.api = WOsu.API;
-	
-	console.log(options);
-	
-	if (options.api && options.api.trim()!="") {
-		this.api = options.api.trim();
-	}
-	if (this.api[this.api.length-1]=="/") {
-		this.api = this.api.substring(0,this.api.length-1);
-	}
-	
-	this.status = {
-		replay  : 0,
-		beatmap : 0,
-		skin    : 0,
-		three   : 0
-	};
-	
-	var layers = this.layers = options.layers || {
-		storyboard	: true,
-		gameplay	: false,
-		replay		: false,
-		ui			: false,
-		stat		: true
-	};
-	
-	// Read Skin
-	this.initSkin(options.skin);
-	
-	// Read Replay
-	this.initReplay(options.replay.type,options.replay.data);
-	
-	// Read Storyboard
-	if (layers.storyboard) {
-		//this.initStoryboard();
-	}
-	
-	this.statusInterval = setInterval(function() {
-		instance.updateStatus();
-	},20);
+    var instance = this;
+
+    this.loaded = false;
+    this.playing = false;
+
+    this.api = WOsu.API;
+
+    console.log(options);
+
+    if (options.api && options.api.trim() != "") {
+        this.api = options.api.trim();
+    }
+    if (this.api[this.api.length - 1] == "/") {
+        this.api = this.api.substring(0, this.api.length - 1);
+    }
+
+    var layers = this.layers = options.layers || {
+        storyboard: true,
+        gameplay: false,
+        replay: false,
+        ui: false,
+        stat: true
+    };
+
+    WOsu.resync(instance, [{ // Load skin
+        fn: instance.loadSkin,
+        args: [options.skin]
+    }, { // Load replay
+        fn: instance.loadReplay,
+        args: [options.replay.type, options.replay.data]
+    }], function() {
+        instance.callback.progress("Replay", "Finished");
+
+        instance.loadBeatmap(function() {
+            WOsu.resync(instance, [{
+                fn: instance.loadAudio,
+                args: []
+            }, {
+                fn: instance.loadThree,
+                args: []
+            }], function() {
+                instance.callback.completion();
+            });
+        });
+    });
+
+    // TODO Read storyboard
+    // this.initStoryboard();
 }
 
 WOsu.Player.prototype.setProgressCallback = function(callback) {
-	this.callback.progress = callback;
+    this.callback.progress = callback;
 }
 
 WOsu.Player.prototype.setCompletionCallback = function(callback) {
-	this.callback.completion = callback;
+    this.callback.completion = callback;
 }
 
 WOsu.Player.prototype.setErrorCallback = function(callback) {
-	this.callback.error = callback;
+    this.callback.error = callback;
 }
 
-WOsu.Player.prototype.initSkin = function(loc) {
-	var instance = this;
-	
-	WOsu.async(function() {
-		instance.skin = WOsu.SkinLoader.load(loc,instance.callback.progress);
-	});
+WOsu.Player.prototype.loadSkin = function(resyncFinish, loc) {
+    var instance = this;
+
+    // Progress callback for the skin loader
+    var progress = function(loaded, total) {
+        instance.callback.progress("Skin", loaded + " / " + total + " loaded");
+        if (loaded == total) {
+            instance.callback.progress("Skin", "Finished");
+            resyncFinish();
+        }
+    };
+
+    instance.skin = WOsu.SkinLoader.load(loc, progress);
 }
 
-WOsu.Player.prototype.initReplay = function(type,data) {
-	var instance = this;
-	this.callback.progress("Replay","Loading replay");
-	
-	// When finished, parse the replay info
-	function finish() {
-		instance.parseReplayInfo();
-	}
-	
-	// Failure
-	function fail() {
-		instance.status.replay = -1;
-	}
-	
-	if (type=="file") {
-		var fd = new FormData();
-		fd.append("replayFile",data.files[0]);
-		$.ajax({
-			url: "lib/GetReplay.php",
-			data: fd,
-			cache: false,
-			contentType: false,
-			processData: false,
-			type: "POST",
-		}).done(function(data) {
-			try {
-				var error = JSON.parse(data);
-				fail();
-			}
-			catch (e) {
-				if (!instance.parseRawReplay(data,finish)) {
-					fail();
-				}
-			}
-		}).fail(function(data) {
-			fail();
-		});
-	}
-	else {
-		$.ajax({
-			url: instance.api + "/get/" + B64.encode(encodeURI(data)),
-			contentType: false,
-			processData: false,
-			type: "GET",
-		}).done(function(data) {
-			if (!instance.parseJSONReplay(data,finish)) {
-				try {
-					var error = JSON.parse(data);
-					fail();
-				}
-				catch (e) {
-					if (!instance.parseRawReplay(data,finish)) {
-						fail();
-					}
-				}
-			}
-		}).fail(function(data) {
-			fail();
-		});
-	}
+WOsu.Player.prototype.loadReplay = function(resyncFinish, type, data) {
+    var instance = this;
+    this.callback.progress("Replay", "Loading replay");
+
+    // When finished, parse the replay info and call the callback
+    function localFinish(success) {
+        instance.parseReplayInfo();
+        resyncFinish();
+    }
+
+    // Failure
+    function localError(message) {
+        instance.callback.error("Replay", message);
+    }
+
+    if (type == "file") {
+        var fd = new FormData();
+        fd.append("replayFile", data.files[0]);
+        $.ajax({
+            url: "lib/GetReplay.php",
+            data: fd,
+            cache: false,
+            contentType: false,
+            processData: false,
+            type: "POST",
+        }).done(function(data) {
+            try {
+                var error = JSON.parse(data);
+                localError(error.message);
+            } catch (e) {
+                instance.parseRawReplay(data, localFinish);
+            }
+        }).fail(function(data) {
+            localError("Failed to upload replay");
+        });
+    } else {
+        $.ajax({
+            url: instance.api + "/get/" + B64.encode(encodeURI(data)),
+            contentType: false,
+            processData: false,
+            type: "GET",
+        }).done(function(data) {
+            if (!instance.parseJSONReplay(data, localFinish)) {
+                try {
+                    var error = JSON.parse(data);
+                    localError(error.message);
+                } catch (e) {
+                    instance.parseRawReplay(data, localFinish);
+                }
+            }
+        }).fail(function(data) {
+            localError("Failed to retrieve replay");
+        });
+    }
 }
 
-// Parse a replay in binary osr format
-WOsu.Player.prototype.parseRawReplay = function(bytedata,finish) {
-	var instance = this;
-	this.callback.progress("Replay","Loading raw replay");
-	
-	function complete() {
-		finish();
-	}
-	
-	function progress(percent) {
-		if (percent<1) instance.status.replay = percent;
-	}
-	
-	this.replay = WOsu.ReplayLoader.loadRaw(bytedata,complete,progress);
+/**
+    Parse a replay in binary osr format
+ */
+WOsu.Player.prototype.parseRawReplay = function(bytedata, finish) {
+    var instance = this;
+    this.callback.progress("Replay", "Loading raw replay");
+
+    function progress(percent) {
+        instance.callback.progress("Replay", "Loading raw replay (" + percent + "%)");
+    }
+
+    this.replay = WOsu.ReplayLoader.loadRaw(bytedata, finish, progress);
 }
 
-// Parse an pre-parsed replay in json format
-WOsu.Player.prototype.parseJSONReplay = function(data,finish) {
-	var instance = this;
-	this.callback.progress("Replay","Loading JSON replay");
-	
-	try {
-		this.replay = WOsu.ReplayLoader.loadJSON(JSON.parse(data));
-		finish();
-		
-		return true;
-	}
-	catch (e) {
-		return false;
-	}
+/**
+    Parse an pre-parsed replay in json format
+ */
+WOsu.Player.prototype.parseJSONReplay = function(data, finish) {
+    var instance = this;
+    this.callback.progress("Replay", "Loading JSON replay");
+
+    try {
+        this.replay = WOsu.ReplayLoader.loadJSON(JSON.parse(data));
+        finish();
+
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
 
-// Parse replay information to proceed loading other resources
+/**
+    Parse replay information to proceed loading other resources
+ */
 WOsu.Player.prototype.parseReplayInfo = function() {
-	var instance = this;
-	this.callback.progress("Replay","Parsing replay");
-	
-	console.log(this.replay);
-	
-	this.replay.index = 0;
-	if (this.replay && this.replay.type==0 && this.replay.bhash.length==32) {
-		this.status.replay = 1;
-		$.ajax({
-			url: instance.api + "/" + this.replay.bhash,
-			type: "GET",
-		}).done(function(data) {
-			instance.metadata = data;
-			instance.initBeatmap();
-		}).fail(function(data) {
-			instance.callback.error("Beatmap","Error retreiving metadata");
-		});
-	}
-	else {
-		instance.callback.error("Beatmap","Invalid replay");
-	}
+    var instance = this;
+
+    // NOTE DEBUGGING
+    console.log(this.replay);
 }
 
-WOsu.Player.prototype.initBeatmap = function() {
-	var instance = this;
-	this.callback.progress("Replay","Finished");
-	this.callback.progress("Beatmap","Loading");
-	
-	$.ajax({
-		url: instance.api + "/" + this.replay.bhash + "/R",
-		contentType: false,
-		processData: false,
-		type: "GET",
-	}).done(function(data) {
-		instance.beatmap = WOsu.BeatmapLoader.load(data);
-		instance.callback.progress("Beatmap","Success");
-		WOsu.async(function() {
-			instance.initAudio();
-		});
-		WOsu.async(function() {
-			instance.calculateBeatmap();
-			instance.loadThree();
-		});
-	}).fail(function(data) {
-		if (typeof(data)=="object" && data.readyState==4 && data.status==200) {
-			instance.beatmap = WOsu.BeatmapLoader.load(data.responseText);
-			instance.callback.progress("Beatmap","Success");
-			WOsu.async(function() {
-				instance.initAudio();
-			});
-			WOsu.async(function() {
-				instance.calculateBeatmap();
-				instance.loadThree();
-			});
-		}
-		else {
-			instance.beatmap = new WOsu.Beatmap();
-			instance.callback.progress("Beatmap","Failed");
-		}
-	});
+WOsu.Player.prototype.loadBeatmap = function(finish) {
+    var instance = this;
+
+    this.callback.progress("Beatmap", "Loading");
+
+    function localFinish() {
+        instance.callback.progress("Beatmap", "Success");
+        instance.calculateBeatmap();
+        finish();
+    }
+
+    // Make sure the replay is loaded and it contains a beatmap hash
+    if (this.replay && this.replay.type == 0 && this.replay.bhash.length == 32) {
+        // Get beatmap metadata
+        $.ajax({
+            url: instance.api + "/" + this.replay.bhash,
+            type: "GET",
+        }).done(function(data) {
+            instance.metadata = data;
+
+            // Get beatmap data
+            $.ajax({
+                url: instance.api + "/" + instance.replay.bhash + "/R",
+                contentType: false,
+                processData: false,
+                type: "GET",
+            }).done(function(data) {
+                // Load the beatmap
+                instance.beatmap = WOsu.BeatmapLoader.load(data);
+
+                localFinish();
+            }).fail(function(data) {
+                // In case the data comes as a typical xhr request (?)
+                if (typeof(data) == "object" && data.readyState == 4 && data.status == 200) {
+                    instance.beatmap = WOsu.BeatmapLoader.load(data.responseText);
+
+
+                    localFinish();
+                } else {
+                    instance.beatmap = new WOsu.Beatmap();
+                    instance.callback.progress("Beatmap", "Failed");
+                }
+            });
+        }).fail(function(data) {
+            instance.callback.error("Beatmap", "Error retreiving metadata");
+        });
+    } else {
+        instance.callback.error("Beatmap", "Invalid replay");
+    }
 }
 
 WOsu.Player.prototype.calculateBeatmap = function() {
-	this.callback.progress("Beatmap","Calculating beatmap mechanics");
-	
-	this.beatmap.calculate();
-	
-	this.status.beatmap = 1;
-	this.callback.progress("Beatmap","Finished");
+    this.callback.progress("Beatmap", "Calculating beatmap mechanics");
+
+    this.beatmap.calculate();
+
+    this.callback.progress("Beatmap", "Finished");
 }
 
-WOsu.Player.prototype.initAudio = function() {
-	this.callback.progress("Audio","Loading");
-	
-	var audioElement = document.createElement("audio");
-	audioElement.preload = "auto";
-	audioElement.volume = 0.3;
-	audioElement.setAttribute("src", this.api + "/" + this.metadata.song + "/R/" + this.beatmap.BeatmapData.AudioFilename);
-	audioElement.setAttribute("controls", "controls");
-	this.elements.audio = this.audio = audioElement;
-	
-	this.callback.progress("Audio","Finished");
+WOsu.Player.prototype.loadAudio = function(resyncFinish) {
+    this.callback.progress("Audio", "Loading");
+
+    var audioElement = document.createElement("audio");
+    audioElement.preload = "auto";
+    audioElement.volume = 0.3;
+    audioElement.setAttribute("src", this.api + "/" + this.metadata.song + "/R/" + this.beatmap.BeatmapData.AudioFilename);
+    audioElement.setAttribute("controls", "controls");
+    this.elements.audio = this.audio = audioElement;
+
+    this.callback.progress("Audio", "Finished");
+
+    resyncFinish();
 }
 
-WOsu.Player.prototype.updateStatus = function() {
-	var finished = true;
-	
-	this.status.skin = this.skin.status;
-	
-	for (var i in this.status) {
-		if (this.status[i]<1) finished = false;
-	}
-	
-	if (finished) {
-		clearInterval(this.statusInterval);
-		this.callback.completion();
-	}
-}
+WOsu.Player.prototype.loadThree = function(resyncFinish) {
+    var instance = this;
 
-WOsu.Player.prototype.loadThree = function() {
-	var instance = this;
-	
-	this.callback.progress("Three","Loading objects");
-	
-	// Scene
-	var scene = new THREE.Scene();
-	scene.add(this.three.camera);
-	scene.add(this.three.light);
-	
-	// Game
-	var game = {};
-	
-	// Storyboard (background only for now)
-	var storyboard = new THREE.Object3D();
-	{
-		var bgpath = "";
-		var bme = this.beatmap.BeatmapEvents.BackgroundEvents;
-		for (var i=0; i<bme.length; i++) {
-			if (bme[i].type==WOsu.Event.TYPE_BACKGROUND) {
-				bgpath = this.api + "/" + this.metadata.song + "/R/" + bme[i].media;
-				break;
-			}
-		}
-		
-		if (bgpath!="") {
-			var bgtex = THREE.ImageUtils.loadTexture(bgpath);
-			var background = WOsu.create_quad_mesh({
-				x : 0, y : 0, z : -this.beatmap.BeatmapObjects.length-10,
-				width : 640, height: 480,
-				color : new THREE.Vector4(0.5,0.5,0.5,1),
-				texture : bgtex
-			});
-		}
-		
-		storyboard.background = background;
-		storyboard.add(background);
-	}
-	
-	// Hit objects
-	var gameplay = new THREE.Object3D();
-	{
-		var bme = this.beatmap.BeatmapEvents.BackgroundEvents;
-		var bmo = this.beatmap.BeatmapObjects;
-		var bmm = this.beatmap.BeatmapMechanics;
-		var textures = ORV.player.skin.textures;
-		
-		game.objects = [];
-		game.start = 0;
-		game.end = 0;
-		game.colors = bme.Colours || [[0xFF,0x80,0x80],[0x80,0xFF,0x00],[0x00,0x80,0xC0],[0xFF,0xFF,0x80]];
-		
-		var total = bmo.length;
-		var cobj,objs;
-		var lastPosition = new THREE.Vector3(-1,-1,0);
-		var offset = new THREE.Vector3(0,0,0);
-		var comboColor = 0;
-		var comboNumber = 1;
-		
-		for (var i=0; i<total; i++) {
-			cobj = bmo[i];
-			if (cobj.time<bmm.AR) game.end++;
-			
-			if (lastPosition.x==cobj.endX && lastPosition.y==cobj.endY) {
-				offset.x += 4;
-				offset.y -= 4;
-			}
-			else {
-			}
-			
-			offset.x = 0;
-			offset.y = 0;
-			offset.z = -i-1;
-			lastPosition.x = cobj.endX;
-			lastPosition.y = cobj.endY;
-			
-			if (cobj.isComboChange()) {
-				comboColor++;
-				comboNumber = 1;
-			}
-			cobj.combo = comboColor % game.colors.length;
-			cobj.comboNumber = comboNumber;
-			
-			if (cobj.isBeat()) {
-				objs = WOsu.create_beat(cobj,offset,game.colors[cobj.combo],bmm,textures);
-			}
-			else if (cobj.isSlider()) {
-				objs = WOsu.create_slider(cobj,offset,game.colors[cobj.combo],bmm,textures);
-			}
-			else if (cobj.isSpinner()) {
-				objs = WOsu.create_spinner(cobj,offset,game.colors[cobj.combo],bmm,textures);
-			}
-			
-			comboNumber++;
-			
-			game.objects.push(objs);
-		}
-		
-		for (var i=0; i<game.end; i++) {
-			gameplay.add(game.objects[i].main);
-		}
-		
-		this.game = game;
-	}
-	
-	// Replay
-	var replay = new THREE.Object3D();
-	{
-		game.replay = {
-			index : 0
-		};
-		
-		if (this.layers.replay) {
-			game.replay.cursor = WOsu.create_cursor(textures);
-			replay.add(game.replay.cursor._main);
-		}
-	}
-	
-	// UI
-	var ui = new THREE.Object3D();
-	{
-	}
-	
-	// Stat
-	var stat = new THREE.Object3D();
-	{
-	}
-	
-	this.three.layers = {
-		storyboard : storyboard,
-		gameplay   : gameplay,
-		replay     : replay,
-		ui         : ui,
-		stat       : stat
-	};
-	
-	for (var l in this.layers) {
-		scene.add(this.three.layers[l]);
-		
-		if (!this.layers[l]) {
-			this.three.layers[l].traverse(function(o) { o.visible = true; });
-		}
-	}
-	
-	this.three.scene = scene;
-	this.status.three = 1;
-	
-	this.callback.progress("Three","Finished");
+    this.callback.progress("Three", "Loading objects");
+    
+    // Scene
+    var scene = new THREE.Scene();
+    scene.add(this.three.camera);
+    scene.add(this.three.light);
+
+    // Game
+    var game = {};
+
+    // Storyboard (background only for now)
+    var storyboard = new THREE.Object3D(); {
+        var bgpath = "";
+        var bme = this.beatmap.BeatmapEvents.BackgroundEvents;
+        for (var i = 0; i < bme.length; i++) {
+            if (bme[i].type == WOsu.Event.TYPE_BACKGROUND) {
+                bgpath = this.api + "/" + this.metadata.song + "/R/" + bme[i].media;
+                break;
+            }
+        }
+
+        if (bgpath != "") {
+            var bgtex = THREE.ImageUtils.loadTexture(bgpath);
+            var background = WOsu.create_quad_mesh({
+                x: 0,
+                y: 0,
+                z: -this.beatmap.BeatmapObjects.length - 10,
+                width: 640,
+                height: 480,
+                color: new THREE.Vector4(0.5, 0.5, 0.5, 1),
+                texture: bgtex
+            });
+        }
+
+        storyboard.background = background;
+        storyboard.add(background);
+    }
+
+    // Hit objects
+    var gameplay = new THREE.Object3D(); {
+        var bme = this.beatmap.BeatmapEvents.BackgroundEvents;
+        var bmo = this.beatmap.BeatmapObjects;
+        var bmm = this.beatmap.BeatmapMechanics;
+        var textures = ORV.player.skin.textures;
+
+        game.objects = [];
+        game.start = 0;
+        game.end = 0;
+        game.colors = bme.Colours || [
+            [0xFF, 0x80, 0x80],
+            [0x80, 0xFF, 0x00],
+            [0x00, 0x80, 0xC0],
+            [0xFF, 0xFF, 0x80]
+        ];
+
+        var total = bmo.length;
+        var cobj, objs;
+        var lastPosition = new THREE.Vector3(-1, -1, 0);
+        var offset = new THREE.Vector3(0, 0, 0);
+        var comboColor = 0;
+        var comboNumber = 1;
+
+        for (var i = 0; i < total; i++) {
+            cobj = bmo[i];
+            if (cobj.time < bmm.AR) game.end++;
+
+            if (lastPosition.x == cobj.endX && lastPosition.y == cobj.endY) {
+                offset.x += 4;
+                offset.y -= 4;
+            } else {}
+
+            offset.x = 0;
+            offset.y = 0;
+            offset.z = -i - 1;
+            lastPosition.x = cobj.endX;
+            lastPosition.y = cobj.endY;
+
+            if (cobj.isComboChange()) {
+                comboColor++;
+                comboNumber = 1;
+            }
+            cobj.combo = comboColor % game.colors.length;
+            cobj.comboNumber = comboNumber;
+
+            if (cobj.isBeat()) {
+                objs = WOsu.create_beat(cobj, offset, game.colors[cobj.combo], bmm, textures);
+            } else if (cobj.isSlider()) {
+                objs = WOsu.create_slider(cobj, offset, game.colors[cobj.combo], bmm, textures);
+            } else if (cobj.isSpinner()) {
+                objs = WOsu.create_spinner(cobj, offset, game.colors[cobj.combo], bmm, textures);
+            }
+
+            comboNumber++;
+
+            game.objects.push(objs);
+        }
+
+        for (var i = 0; i < game.end; i++) {
+            gameplay.add(game.objects[i].main);
+        }
+
+        this.game = game;
+    }
+
+    // Replay
+    var replay = new THREE.Object3D(); {
+        game.replay = {
+            index: 0
+        };
+
+        if (this.layers.replay) {
+            game.replay.cursor = WOsu.create_cursor(textures);
+            replay.add(game.replay.cursor._main);
+        }
+    }
+
+    // UI
+    var ui = new THREE.Object3D(); {}
+
+    // Stat
+    var stat = new THREE.Object3D(); {}
+
+    this.three.layers = {
+        storyboard: storyboard,
+        gameplay: gameplay,
+        replay: replay,
+        ui: ui,
+        stat: stat
+    };
+
+    for (var l in this.layers) {
+        scene.add(this.three.layers[l]);
+
+        if (!this.layers[l]) {
+            this.three.layers[l].traverse(function(o) {
+                o.visible = true;
+            });
+        }
+    }
+
+    this.three.scene = scene;
+
+    this.callback.progress("Three", "Finished");
+
+    resyncFinish();
 }
 
 WOsu.Player.prototype.play = function() {
-	var instance = this;
-	this.playing = true;
-	
-	this.playing = true;
-	this.audio.load();
-	this.audio.addEventListener("canplay",function() { instance.audio.play(); });
-	
-	function frame() {
-		requestAnimationFrame(frame);
-		
-		if (instance.playing) {
-			var time = instance.audio.currentTime*1000;
-			instance.frame_game(time);
-			instance.frame_replay(time);
-		}
-		
-		instance.three.renderer.render(instance.three.scene,instance.three.camera);
-	}
-	
-	frame();
+    var instance = this;
+    this.playing = true;
+
+    this.playing = true;
+    this.audio.load();
+    this.audio.addEventListener("canplay", function() {
+        instance.audio.play();
+    });
+
+    function frame() {
+        requestAnimationFrame(frame);
+
+        if (instance.playing) {
+            var time = instance.audio.currentTime * 1000;
+            instance.frame_game(time);
+            instance.frame_replay(time);
+        }
+
+        instance.three.renderer.render(instance.three.scene, instance.three.camera);
+    }
+
+    frame();
 }
 
 WOsu.Player.prototype.frame_game = function(time) {
-	var game = this.game;
-	var hobj,gobj,cobj,dt,op;
-	
-	for (var i=game.start; i<game.end; i++) {
-		hobj = this.beatmap.BeatmapObjects[i];
-		gobj = game.objects[i];
-		dt = hobj.time-time;
-		
-		if (dt>=0 && dt<=this.beatmap.BeatmapMechanics.AR) {
-			op = 1-dt/this.beatmap.BeatmapMechanics.AR;
-			for (var j in gobj) {
-				if (j[0]!="_") {
-					for (var k=0; k<gobj[j].geometry.vertices.length; k++) {
-						gobj[j].attributes.wosuColor.value[k].w = op;
-					}
-					gobj[j].attributes.wosuColor.needsUpdate = true;
-				}
-			}
-			gobj._opaque = false;
-			if (hobj.isBeat()) {
-				gobj.approachcircle.scale.set(3-op*2,3-op*2,1);
-			}
-			else if (hobj.isSlider()) {
-				gobj.approachcircle.scale.set(3-op*2,3-op*2,1);
-				gobj.slider_ball.visible = false;
-				gobj.slider_follow.visible = false;
-			}
-		}
-		else {
-			if (hobj.isBeat() || hobj.isSlider()) {
-				gobj.approachcircle.visible = false;
-				if (!gobj._opaque) {
-					gobj._opaque = true;
-					for (var j in gobj) {
-						if (j[0]!="_") {
-							for (var k=0; k<gobj[j].geometry.vertices.length; k++) {
-								gobj[j].attributes.wosuColor.value[k].w = 1;
-							}
-							gobj[j].attributes.wosuColor.needsUpdate = true;
-						}
-					}
-				}
-			}
-			if (hobj.endTime-time<-this.beatmap.BeatmapMechanics.AR) {
-				this.three.scene.remove(game.objects[game.start]._main);
-				game.start++;
-			}
-			else if (hobj.endTime-time<0) {
-				op = (1 - Math.abs((time-hobj.endTime)/this.beatmap.BeatmapMechanics.AR*2 - 1))*0.5;
-				for (var k=0; k<gobj._lighting.geometry.vertices.length; k++) {
-					gobj._lighting.attributes.wosuColor.value[k].w = op;
-				}
-				gobj._lighting.attributes.wosuColor.needsUpdate = true;
-				var sop = (time-hobj.endTime)/this.beatmap.BeatmapMechanics.AR * 0.1 + 2;
-				gobj._lighting.scale.set(sop,sop,1);
-				
-				for (var j in gobj) {
-					if (j[0]!="_") {
-						gobj[j].visible = false;
-					}
-				}
-			}
-			else {
-				if (hobj.isSlider()) { // Slider Ball
-					gobj.slider_ball.visible = true;
-					gobj.slider_follow.visible = true;
-					var pos = hobj.getPosition(time);
-					gobj.slider_ball.position.set(pos[0]-hobj.x,hobj.y-pos[1],0.3);
-					gobj.slider_follow.position.set(pos[0]-hobj.x,hobj.y-pos[1],0.35);
-				}
-				else if (hobj.isSpinner()) { // Spinner Approach Circle
-					op = (time - hobj.time)/hobj.spinnerTime;
-					gobj.spinner_approachcircle.scale.set(1-op,1-op,1);
-				}
-			}
-		}
-	}
-	
-	// Add appearing objects
-	hobj = this.beatmap.BeatmapObjects[game.end];
-	if (hobj!=undefined && hobj.time-time<this.beatmap.BeatmapMechanics.AR && game.end<this.beatmap.BeatmapObjects.length) {
-		var gobj = game.objects[game.end];
-		this.three.scene.add(gobj._main);
-		game.end++;
-	}
+    var game = this.game;
+    var hobj, gobj, cobj, dt, op;
+
+    for (var i = game.start; i < game.end; i++) {
+        hobj = this.beatmap.BeatmapObjects[i];
+        gobj = game.objects[i];
+        dt = hobj.time - time;
+
+        if (dt >= 0 && dt <= this.beatmap.BeatmapMechanics.AR) {
+            op = 1 - dt / this.beatmap.BeatmapMechanics.AR;
+            for (var j in gobj) {
+                if (j[0] != "_") {
+                    for (var k = 0; k < gobj[j].geometry.vertices.length; k++) {
+                        gobj[j].attributes.wosuColor.value[k].w = op;
+                    }
+                    gobj[j].attributes.wosuColor.needsUpdate = true;
+                }
+            }
+            gobj._opaque = false;
+            if (hobj.isBeat()) {
+                gobj.approachcircle.scale.set(3 - op * 2, 3 - op * 2, 1);
+            } else if (hobj.isSlider()) {
+                gobj.approachcircle.scale.set(3 - op * 2, 3 - op * 2, 1);
+                gobj.slider_ball.visible = false;
+                gobj.slider_follow.visible = false;
+            }
+        } else {
+            if (hobj.isBeat() || hobj.isSlider()) {
+                gobj.approachcircle.visible = false;
+                if (!gobj._opaque) {
+                    gobj._opaque = true;
+                    for (var j in gobj) {
+                        if (j[0] != "_") {
+                            for (var k = 0; k < gobj[j].geometry.vertices.length; k++) {
+                                gobj[j].attributes.wosuColor.value[k].w = 1;
+                            }
+                            gobj[j].attributes.wosuColor.needsUpdate = true;
+                        }
+                    }
+                }
+            }
+            if (hobj.endTime - time < -this.beatmap.BeatmapMechanics.AR) {
+                this.three.scene.remove(game.objects[game.start]._main);
+                game.start++;
+            } else if (hobj.endTime - time < 0) {
+                op = (1 - Math.abs((time - hobj.endTime) / this.beatmap.BeatmapMechanics.AR * 2 - 1)) * 0.5;
+                for (var k = 0; k < gobj._lighting.geometry.vertices.length; k++) {
+                    gobj._lighting.attributes.wosuColor.value[k].w = op;
+                }
+                gobj._lighting.attributes.wosuColor.needsUpdate = true;
+                var sop = (time - hobj.endTime) / this.beatmap.BeatmapMechanics.AR * 0.1 + 2;
+                gobj._lighting.scale.set(sop, sop, 1);
+
+                for (var j in gobj) {
+                    if (j[0] != "_") {
+                        gobj[j].visible = false;
+                    }
+                }
+            } else {
+                if (hobj.isSlider()) { // Slider Ball
+                    gobj.slider_ball.visible = true;
+                    gobj.slider_follow.visible = true;
+                    var pos = hobj.getPosition(time);
+                    gobj.slider_ball.position.set(pos[0] - hobj.x, hobj.y - pos[1], 0.3);
+                    gobj.slider_follow.position.set(pos[0] - hobj.x, hobj.y - pos[1], 0.35);
+                } else if (hobj.isSpinner()) { // Spinner Approach Circle
+                    op = (time - hobj.time) / hobj.spinnerTime;
+                    gobj.spinner_approachcircle.scale.set(1 - op, 1 - op, 1);
+                }
+            }
+        }
+    }
+
+    // Add appearing objects
+    hobj = this.beatmap.BeatmapObjects[game.end];
+    if (hobj != undefined && hobj.time - time < this.beatmap.BeatmapMechanics.AR && game.end < this.beatmap.BeatmapObjects.length) {
+        var gobj = game.objects[game.end];
+        this.three.scene.add(gobj._main);
+        game.end++;
+    }
 }
 
 WOsu.Player.prototype.frame_replay = function(time) {
-	var rpo = this.replay; // Replay object
-	var rpg = this.game.replay; // Replay game data
-	var rpl = this.three.layers.replay; // Replay THREE objects
-	
-	while (rpg.index<rpo.replayData.length-1 && time>rpo.replayData[rpg.index+1][0]) {
-		rpg.index++;
-	}
-	
-	var rd = rpo.replayData[rpg.index];
-	var nd;
-	if (rpg.index==rpo.replayData.length-1) nd = rd;
-	else nd = rpo.replayData[rpg.index+1];
-	
-	var p1 = new THREE.Vector3(rd[1]-256,192-rd[2],0);
-	var p2 = new THREE.Vector3(nd[1]-256,192-nd[2],0);
-	var interp = (nd[0]-rd[0]==0) ? 0 : (time-rd[0])/(nd[0]-rd[0]);
-	
-	var cursor = rpg.cursor._main;
-	cursor.position.set(p1.x*(1-interp) + p2.x*interp,p1.y*(1-interp) + p2.y*interp,0);
-	
-	var cscale = cursor.scale.x;
-	if (rd[3]>0 && cscale<1.4) {
-		cscale += 0.05;
-	}
-	else if (rd[3]==0 && cscale>1.0) {
-		cscale -= 0.05;
-	}
-	cursor.scale.set(cscale,cscale,1);
-}
+    var rpo = this.replay; // Replay object
+    var rpg = this.game.replay; // Replay game data
+    var rpl = this.three.layers.replay; // Replay THREE objects
 
+    while (rpg.index < rpo.replayData.length - 1 && time > rpo.replayData[rpg.index + 1][0]) {
+        rpg.index++;
+    }
+
+    var rd = rpo.replayData[rpg.index];
+    var nd;
+    if (rpg.index == rpo.replayData.length - 1) nd = rd;
+    else nd = rpo.replayData[rpg.index + 1];
+
+    var p1 = new THREE.Vector3(rd[1] - 256, 192 - rd[2], 0);
+    var p2 = new THREE.Vector3(nd[1] - 256, 192 - nd[2], 0);
+    var interp = (nd[0] - rd[0] == 0) ? 0 : (time - rd[0]) / (nd[0] - rd[0]);
+
+    var cursor = rpg.cursor._main;
+    cursor.position.set(p1.x * (1 - interp) + p2.x * interp, p1.y * (1 - interp) + p2.y * interp, 0);
+
+    var cscale = cursor.scale.x;
+    if (rd[3] > 0 && cscale < 1.4) {
+        cscale += 0.05;
+    } else if (rd[3] == 0 && cscale > 1.0) {
+        cscale -= 0.05;
+    }
+    cursor.scale.set(cscale, cscale, 1);
+}
 WOsu.Skin = function(url) {
-	this.url = url || "";
-	this.textures = {};
-	this.status = 0;
+    this.url = url || "";
+    this.textures = {};
+    this.status = 0;
 }
 
 WOsu.Skin.prototype.constructor = WOsu.Skin;
 
 WOsu.Skin.textureList = { // List of textures
-	approachcircle         : "approachcircle.png",
-	
-	cursor                 : "cursor.png",
-	cursortrail            : "cursortrail.png",
-	
-	hitcircle              : "hitcircle.png",
-	hitcircle_overlay      : "hitcircleoverlay.png",
-	
-	slider_b               : "sliderb.png",
-	slider_followcircle    : "sliderfollowcircle.png",
-	slider_point10         : "sliderpoint10.png",
-	slider_point30         : "sliderpoint30.png",
-	slider_scorepoint      : "sliderscorepoint.png",
-	reversearrow           : "reversearrow.png",
-	
-	spinner_approachcircle : "spinner-approachcircle.png",
-	spinner_background     : "spinner-background.png",
-	spinner_circle         : "spinner-circle.png",
-	spinner_clear          : "spinner-clear.png",
-	spinner_metre          : "spinner-metre.png",
-	spinner_osu            : "spinner-osu.png",
-	spinner_rpm            : "spinner-rpm.png",
-	spinner_spin           : "spinner-spin.png",
-	
-	hit_0                  : "hit0.png",
-	hit_50                 : "hit50.png",
-	hit_50k                : "hit50k.png",
-	hit_100                : "hit100.png",
-	hit_100k               : "hit100k.png",
-	hit_300                : "hit300.png",
-	hit_300g               : "hit300g.png",
-	hit_300k               : "hit300k.png",
-	
-	lighting               : "lighting.png",
-	
-	default_0              : "default-0.png",
-	default_1              : "default-1.png",
-	default_2              : "default-2.png",
-	default_3              : "default-3.png",
-	default_4              : "default-4.png",
-	default_5              : "default-5.png",
-	default_6              : "default-6.png",
-	default_7              : "default-7.png",
-	default_8              : "default-8.png",
-	default_9              : "default-9.png",
-	
-	score_0                : "score-0.png",
-	score_1                : "score-1.png",
-	score_2                : "score-2.png",
-	score_3                : "score-3.png",
-	score_4                : "score-4.png",
-	score_5                : "score-5.png",
-	score_6                : "score-6.png",
-	score_7                : "score-7.png",
-	score_8                : "score-8.png",
-	score_9                : "score-9.png",
-	score_comma            : "score-comma.png",
-	score_dot              : "score-dot.png",
-	score_percent          : "score-percent.png",
-	score_x                : "score-x.png",
-	
-	scorebar_bg            : "scorebar-bg.png",
-	scorebar_colour        : "scorebar-colour.png",
-	scorebar_ki            : "scorebar-ki.png",
-	scorebar_kidanger      : "scorebar-kidanger.png",
-	scorebar_kidanger2     : "scorebar-kidanger2.png",
-	
-	section_fail           : "section-fail.png",
-	section_pass           : "section-pass.png",
-	
-	volume                 : "volume-bg.png"
+    approachcircle: "approachcircle.png",
+
+    cursor: "cursor.png",
+    cursortrail: "cursortrail.png",
+
+    hitcircle: "hitcircle.png",
+    hitcircle_overlay: "hitcircleoverlay.png",
+
+    slider_b: "sliderb.png",
+    slider_followcircle: "sliderfollowcircle.png",
+    slider_point10: "sliderpoint10.png",
+    slider_point30: "sliderpoint30.png",
+    slider_scorepoint: "sliderscorepoint.png",
+    reversearrow: "reversearrow.png",
+
+    spinner_approachcircle: "spinner-approachcircle.png",
+    spinner_background: "spinner-background.png",
+    spinner_circle: "spinner-circle.png",
+    spinner_clear: "spinner-clear.png",
+    spinner_metre: "spinner-metre.png",
+    spinner_osu: "spinner-osu.png",
+    spinner_rpm: "spinner-rpm.png",
+    spinner_spin: "spinner-spin.png",
+
+    hit_0: "hit0.png",
+    hit_50: "hit50.png",
+    hit_50k: "hit50k.png",
+    hit_100: "hit100.png",
+    hit_100k: "hit100k.png",
+    hit_300: "hit300.png",
+    hit_300g: "hit300g.png",
+    hit_300k: "hit300k.png",
+
+    lighting: "lighting.png",
+
+    default_0: "default-0.png",
+    default_1: "default-1.png",
+    default_2: "default-2.png",
+    default_3: "default-3.png",
+    default_4: "default-4.png",
+    default_5: "default-5.png",
+    default_6: "default-6.png",
+    default_7: "default-7.png",
+    default_8: "default-8.png",
+    default_9: "default-9.png",
+
+    score_0: "score-0.png",
+    score_1: "score-1.png",
+    score_2: "score-2.png",
+    score_3: "score-3.png",
+    score_4: "score-4.png",
+    score_5: "score-5.png",
+    score_6: "score-6.png",
+    score_7: "score-7.png",
+    score_8: "score-8.png",
+    score_9: "score-9.png",
+    score_comma: "score-comma.png",
+    score_dot: "score-dot.png",
+    score_percent: "score-percent.png",
+    score_x: "score-x.png",
+
+    scorebar_bg: "scorebar-bg.png",
+    scorebar_colour: "scorebar-colour.png",
+    scorebar_ki: "scorebar-ki.png",
+    scorebar_kidanger: "scorebar-kidanger.png",
+    scorebar_kidanger2: "scorebar-kidanger2.png",
+
+    section_fail: "section-fail.png",
+    section_pass: "section-pass.png",
+
+    volume: "volume-bg.png"
 };
+WOsu.SkinLoader = {};
 
-WOsu.SkinLoader = { };
+/**
+    Folder of the default skin elements. Elements in this folder must be complete and accessible.
+ */
+WOsu.SkinLoader.defaultURL = "Skins/default/";
 
-WOsu.SkinLoader.defaultURL = "Skins/funnytrees - view/";
+/**
+    Load skin images from a root path.
+ */
+// FUTURE read skin.ini, 4k, 5k etc.
+// FUTURE handle animated skin elements
+WOsu.SkinLoader.load = function(loc, progress) {
+    var instance = new WOsu.Skin(loc);
+    var lt = this.loadedTextures = {};
+    var textureList = WOsu.Skin.textureList;
 
-WOsu.SkinLoader.load = function(loc,progress) {
-	var instance = new WOsu.Skin(loc);
-	var lt = this.loadedTextures = {};
-	var textureList = WOsu.Skin.textureList;
-	
-	function updateStatus(id,tex) {
-		instance.textures[id] = tex;
-		
-		var loaded = 0;
-		var total = 0;
-		var textureList = WOsu.Skin.textureList;
-		
-		for (var image in textureList) {
-			total++;
-			if (instance.textures[image]!==undefined) {
-				loaded++;
-			}
-		}
-		
-		if (loaded==total) {
-			instance.status = 1;
-		}
-		else {
-			instance.status = loaded/total;
-		}
-		
-		progress("Skin",loaded + " / " + total + " loaded");
-	}
+    function localProgress(id, tex) {
+        instance.textures[id] = tex;
 
-	for (var i in textureList) {
-		(function(j,loc) {
-			WOsu.async(function() {
-				THREE.ImageUtils.loadTexture(
-					loc + textureList[j],
-					undefined,
-					function(tex) {
-						updateStatus(j,tex);
-					},
-					function(evt) {
-						loc = WOsu.SkinLoader.defaultURL;
-						THREE.ImageUtils.loadTexture(
-							loc + textureList[j],
-							undefined,
-							function(tex) {
-								updateStatus(j,tex);
-							},
-							function(evt) {
-								updateStatus(j,null);
-							}
-						);
-					}
-				);
-			},5);
-		})(i,loc);
-	}
-	
-	return instance;
+        var loaded = 0;
+        var total = 0;
+        var textureList = WOsu.Skin.textureList;
+
+        for (var image in textureList) {
+            total++;
+            if (instance.textures[image] !== undefined) {
+                loaded++;
+            }
+        }
+
+        progress(loaded, total);
+    }
+
+    for (var i in textureList) {
+        // NOTE Is there a neater way to do this
+        (function(j, loc) {
+            WOsu.async(function() {
+                // Load texture
+                THREE.ImageUtils.loadTexture(
+                    loc + textureList[j],
+                    undefined,
+                    function(tex) {
+                        localProgress(j, tex);
+                    },
+                    function(evt) {
+                        // Attempt to load default skin
+                        loc = WOsu.SkinLoader.defaultURL;
+                        THREE.ImageUtils.loadTexture(
+                            loc + textureList[j],
+                            undefined,
+                            function(tex) {
+                                localProgress(j, tex);
+                            },
+                            function(evt) {
+                                updateStatus(j, null);
+                            }
+                        );
+                    }
+                );
+            });
+        })(i, loc);
+    }
+
+    return instance;
 }
-
 WOsu.Matrix3 = function(args) {
 	this.matrix = new Array(9);
 	try {
@@ -2464,163 +2492,166 @@ WOsu.Matrix3.prototype.getCSS3Transform = function() {
 	return "matrix(" + [this.matrix[0],this.matrix[3],this.matrix[1],this.matrix[4],this.matrix[2],this.matrix[5]].join() + ")";
 }
 WOsu.Replay = function(json) {
-	this.type = 0; // Gameplay type
-	this.version = 0; // osu! version
-	this.bhash = ""; // Beatmap hash
-	this.player = ""; // Player name
-	this.rhash = ""; // Replay hash
-	this.hits = [0,0,0,0,0,0]; // Hit counts
-	this.score = 0; // Score
-	this.combo = 0; // Combo
-	this.perfect = false; // Perfect replay
-	this.mods = 0; // Mods
-	this.graph = []; // Performance graph
-	this.timestamp = 0; // Timestamp
-	this.replayData = []; // Actions
-	
-	this.status = "";
+    this.type = 0; // Gameplay type
+    this.version = 0; // osu! version
+    this.bhash = ""; // Beatmap hash
+    this.player = ""; // Player name
+    this.rhash = ""; // Replay hash
+    this.hits = [0, 0, 0, 0, 0, 0]; // Hit counts
+    this.score = 0; // Score
+    this.combo = 0; // Combo
+    this.perfect = false; // Perfect replay
+    this.mods = 0; // Mods
+    this.graph = []; // Performance graph
+    this.timestamp = 0; // Timestamp
+    this.replayData = []; // Actions
+
+    this.index = 0; // Action index
+    // TODO Move this index into the player, does not belong here
 }
 
 WOsu.Replay.prototype.constructor = WOsu.Replay;
-
-WOsu.ReplayLoader = { };
+WOsu.ReplayLoader = {};
 
 WOsu.ReplayLoader.loadJSON = function(data, finish, progress) {
-	var replay = new WOsu.Replay();
-	
-	for (var i in json) {
-		this[i] = json[i];
-	}
-	
-	return replay;
+    var replay = new WOsu.Replay();
+
+    for (var i in json) {
+        this[i] = json[i];
+    }
+
+    return replay;
 }
 
 WOsu.ReplayLoader.loadRaw = function(data, finish, progress) {
-	var replay = new WOsu.Replay();
-	
-	var bytes = new Uint8ClampedArray(~~(data.length/2));
-	for (var i=0; i<bytes.length; i++) {
-		bytes[i] = parseInt(data[2*i] + data[2*i+1],16);
-	}
-	var index = 0;
-	
-	function getByte() {
-		return bytes[index++];
-	}
-	
-	function getShort() {
-		return bytes[index++] | (bytes[index++]<<8);
-	}
-	
-	function getInt() {
-		return bytes[index++] | (bytes[index++]<<8) | (bytes[index++]<<16) | (bytes[index++]<<24);
-	}
-	
-	function getLong() {
-		return getInt() + getInt()*0x100000000;
-	}
-	
-	function getULEB128() {
-		var val = 0;
-		var i = 0;
-		var c;
-		while (((c = getByte()) & 0x80)==0x80) {
-			val = val | ((c & 0x7F)<<(i++*7));
-		}
-		val = val | ((c & 0x7F)<<(i++*7));
-		return val;
-	}
-	
-	function getString(len) {
-		var s = "";
-		for (var i=0; i<len; i++) {
-			s += String.fromCharCode(getByte());
-		}
-		return s;
-	}
-	
-	function getBytes(len) {
-		var b = new Uint8ClampedArray(len);
-		for (var i=0; i<len; i++) {
-			b[i] = getByte();
-		}
-		return b;
-	}
-	
-	function getGraph(str) {
-		return str;
-	}
-	
-	function parseReplayData(data) {
-		if (!data) return;
-		var lines = data.split(",");
-		var parts;
-		
-		var time = 0;
-		var bits,actionBits;
-		var M1 = 1, M2 = 2, K1 = 5, K2 = 10;
-		
-		for (var i=0; i<lines.length; i++) {
-			parts = lines[i].split("|");
-			time += parseInt(parts[0]);
-			bits = parseInt(parts[3]);
-			actionBits = 0;
-			if ((bits & K2)==K2) {
-				actionBits |= K2;
-				bits &= ~K2;
-			}
-			if ((bits & K1)==K1) {
-				actionBits |= K1;
-				bits &= ~K1;
-			}
-			if ((bits & M2)==M2) {
-				actionBits |= M2;
-				bits &= ~M2;
-			}
-			if ((bits & M1)==M1) {
-				actionBits |= M1;
-				bits &= ~M1;
-			}
-			replay.replayData.push([time,parseFloat(parts[1]),parseFloat(parts[2]),actionBits]);
-		}
-	}
-	
-	var cont = 0;
-	
-	replay.type = getByte();
-	replay.version = getInt();
-	cont = getByte();
-	if (cont==0x0B) replay.bhash = getString(getULEB128());
-	cont = getByte();
-	if (cont==0x0B) replay.player = getString(getULEB128());
-	cont = getByte();
-	if (cont==0x0B) replay.rhash = getString(getULEB128());
-	replay.hits[0] = getShort();
-	replay.hits[1] = getShort();
-	replay.hits[2] = getShort();
-	replay.hits[3] = getShort();
-	replay.hits[4] = getShort();
-	replay.hits[5] = getShort();
-	replay.score = getInt();
-	replay.combo = getShort();
-	replay.perfect = getByte()==1;
-	replay.mods = getInt();
-	cont = getByte();
-	if (cont==0x0B) replay.graph = getGraph(getString(getULEB128()));
-	replay.timestamp = getLong();
-	
-	var datasize = getInt();
-	LZMA.decompress(
-		bytes.subarray(index),
-		function(data) {
-			parseReplayData(data);
-			finish(replay);
-		},
-		function(percent) {
-			progress(percent);
-		}
-	);
-	
-	return replay;
+    var replay = new WOsu.Replay();
+
+    var bytes = new Uint8ClampedArray(~~(data.length / 2));
+    for (var i = 0; i < bytes.length; i++) {
+        bytes[i] = parseInt(data[2 * i] + data[2 * i + 1], 16);
+    }
+    var index = 0;
+
+    function getByte() {
+        return bytes[index++];
+    }
+
+    function getShort() {
+        return bytes[index++] | (bytes[index++] << 8);
+    }
+
+    function getInt() {
+        return bytes[index++] | (bytes[index++] << 8) | (bytes[index++] << 16) | (bytes[index++] << 24);
+    }
+
+    function getLong() {
+        return getInt() + getInt() * 0x100000000;
+    }
+
+    function getULEB128() {
+        var val = 0;
+        var i = 0;
+        var c;
+        while (((c = getByte()) & 0x80) == 0x80) {
+            val = val | ((c & 0x7F) << (i++ * 7));
+        }
+        val = val | ((c & 0x7F) << (i++ * 7));
+        return val;
+    }
+
+    function getString(len) {
+        var s = "";
+        for (var i = 0; i < len; i++) {
+            s += String.fromCharCode(getByte());
+        }
+        return s;
+    }
+
+    function getBytes(len) {
+        var b = new Uint8ClampedArray(len);
+        for (var i = 0; i < len; i++) {
+            b[i] = getByte();
+        }
+        return b;
+    }
+
+    function getGraph(str) {
+        return str;
+    }
+
+    function parseReplayData(data) {
+        if (!data) return;
+        var lines = data.split(",");
+        var parts;
+
+        var time = 0;
+        var bits, actionBits;
+        var M1 = 1,
+            M2 = 2,
+            K1 = 5,
+            K2 = 10;
+
+        for (var i = 0; i < lines.length; i++) {
+            parts = lines[i].split("|");
+            time += parseInt(parts[0]);
+            bits = parseInt(parts[3]);
+            actionBits = 0;
+            if ((bits & K2) == K2) {
+                actionBits |= K2;
+                bits &= ~K2;
+            }
+            if ((bits & K1) == K1) {
+                actionBits |= K1;
+                bits &= ~K1;
+            }
+            if ((bits & M2) == M2) {
+                actionBits |= M2;
+                bits &= ~M2;
+            }
+            if ((bits & M1) == M1) {
+                actionBits |= M1;
+                bits &= ~M1;
+            }
+            replay.replayData.push([time, parseFloat(parts[1]), parseFloat(parts[2]), actionBits]);
+        }
+    }
+
+    var cont = 0;
+
+    replay.type = getByte();
+    replay.version = getInt();
+    cont = getByte();
+    if (cont == 0x0B) replay.bhash = getString(getULEB128());
+    cont = getByte();
+    if (cont == 0x0B) replay.player = getString(getULEB128());
+    cont = getByte();
+    if (cont == 0x0B) replay.rhash = getString(getULEB128());
+    replay.hits[0] = getShort();
+    replay.hits[1] = getShort();
+    replay.hits[2] = getShort();
+    replay.hits[3] = getShort();
+    replay.hits[4] = getShort();
+    replay.hits[5] = getShort();
+    replay.score = getInt();
+    replay.combo = getShort();
+    replay.perfect = getByte() == 1;
+    replay.mods = getInt();
+    cont = getByte();
+    if (cont == 0x0B) replay.graph = getGraph(getString(getULEB128()));
+    replay.timestamp = getLong();
+
+    var datasize = getInt();
+    LZMA.decompress(
+        bytes.subarray(index),
+        function(data) {
+            parseReplayData(data);
+            finish(replay);
+        },
+        function(percent) {
+            progress(percent);
+        }
+    );
+
+    return replay;
 }
 //# sourceMappingURL=WOsu.js.map
