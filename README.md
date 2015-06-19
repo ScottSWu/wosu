@@ -1,55 +1,56 @@
 wosu
 ====
 
-TODO Clean up and update with new goals.
+Web osu! library.
 
-Web osu! library
+This is a library primarily based off of three.js and lzma.js for reading and displaying osu! related files.
 
-This is a library based off of jQuery, three.js and lzma.js for reading and displaying osu! related files.
-
-Wosu provides both data structures and functions for parsing beatmaps, storyboards and replays.
-
-An example of this library in use can be found [here](http://sc-wu.com/p/Wosu/).
+An example of this library in use can be found [here](http://sc-wu.com/p/wosu/).
 
 
 
-Usage
+Structures
 ----
 
 **Beatmaps**
 
-    $.ajax({
-        url : "beatmap.osu",
-        dataType : "text"
-    }).done(function(data) {
-        var beatmap = WOsu.BeatmapLoader.load(data);
-    });
+    var beatmap = WOsu.BeatmapLoader.load(textData);
 
-Note: This library relies heavily on asynchronous calls.
+Where `textData` are raw contents of an `.osu` file. Currently, only standard maps are supported. Other maps will probably throw an error when reading objects.
 
 
 **Storyboards** (incomplete - still need to port over from the osu! Storyboard Viewer)
 
 
-**Pre-parsed JSON Replays**
-
-    $.ajax({
-        url : "replay.osr.json",
-        dataType : "json"
-    }).done(function(data) {
-        var replay = new WOsu.Replay(data);
-    });
-
-
 **Raw Replays** (e.g. uploaded using GetReplay.php)
 
-    var replay = WOsu.ReplayLoader.load(bytedata,finishCallback,progressCallback);
+    var replay = WOsu.ReplayLoader.load(byteData, finishCallback, progressCallback);
 
-Note: Callbacks are required due to the way lzma.js works.
+Where `byteData` is a string of hexadecimal characters. The two callbacks are used by lzma.js's web workers.
 
 
+**Pre-parsed JSON Replays**
 
-In addition it provides a web player based on three.js. WebGL is required, so Canvas fallback is not an option.
+    var replay = new WOsu.ReplayLoader.loadJSON(jsonData);
+
+Old method of obtaining replays before lzma.js.
+
+
+**Beatmap API**
+
+This library uses an API to identify replays and retrieve beatmap resources. Currently it is using a barebones API [here](https://github.com/ScottSWu/wosu-api).
+
+- `/[0-9a-f]{32}` returns data in json format about a single beatmap or song. Beatmaps are hashed by content. Songs are hashed by name (just as they are downloaded from osu!).
+- `/[0-9a-f]{32}/R` returns raw text data about a beatmap or song. Text data of a song gives a list of all files in the folder.
+- `/[0-9a-f]{32}/R/*` returns any file in the song folder.
+
+
+Player
+----
+
+*This section needs to be updated*
+
+A player is available using,
 
     var player = new WOsu.Player({
         width : width,
@@ -61,7 +62,7 @@ In addition it provides a web player based on three.js. WebGL is required, so Ca
     });
     
     player.load({
-        replay : { type : "urL" , data : "replay.osr.json" },
+        replay : { type : "url" , data : "replay.osr" },
         skin : "skinfolder"
     });
 
@@ -78,8 +79,8 @@ Finally, the player may be started using
     player.play();
 
 
-
-Making Changes
+Development
 ----
 
-"combine.py" dumps all the hardcoded filenames into "WOsuData.js", and a list of all the script tags into "ScriptList.txt". The "ext" folder holds external libraries and files.
+Use grunt to concatenate and map all files. However, since certain files need to be in the right order, each file is currently listed within the Gruntfile.
+Grunt concatenates all scripts in `lib` into `ext/WOsu.js` and `ext/WOsu.js.map`.
