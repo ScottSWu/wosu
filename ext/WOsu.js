@@ -1916,7 +1916,7 @@ WOsu.Player.prototype.loadThreeStoryboard = function(threeResync) {
     }
 
     if (bgpath != "") {
-        var background = this.createQuad({
+        var background = this.createThreeQuad({
             x: 0,
             y: 0,
             z: 0,
@@ -2003,7 +2003,7 @@ WOsu.Player.prototype.loadThreeGameplay = function(threeResync) {
         // TODO Stacked notes
         
         if (hitobj.isBeat()) {
-            this.createCircle({
+            this.createThreeCircle({
                 geometry: circleGeometry,
                 attributes: circleAttributes,
                 object: hitobj,
@@ -2017,9 +2017,6 @@ WOsu.Player.prototype.loadThreeGameplay = function(threeResync) {
             // TODO
         }
     }
-    
-    circleGeometry.computeFaceNormals();
-    circleGeometry.computeVertexNormals();
     
     var circleMesh = new THREE.Mesh(circleGeometry, circleMaterial);
     
@@ -2042,7 +2039,7 @@ WOsu.Player.prototype.loadThreeReplay = function(threeResync) {
     
     var cursorMesh;
     if (this.layers.replay) {
-        cursorMesh = this.createQuad({
+        cursorMesh = this.createThreeCursor({
             x: 0,
             y: 0,
             z: 0,
@@ -2058,6 +2055,10 @@ WOsu.Player.prototype.loadThreeReplay = function(threeResync) {
 
     this.three.layers.replay = replay;
     this.game.cursorMesh = cursorMesh;
+    this.game.replay = {
+        index: 0,
+        lastRelease: Number.NEGATIVE_INFINITY
+    };
 
     threeResync();
 }
@@ -2125,9 +2126,9 @@ WOsu.Player.quadShader = {
         "varying vec4 vColor;",
         
         "void main() {",
-        "    vColor = colorMask;",
-        "    vUv = uv;",
-        "    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "   vColor = colorMask;",
+        "   vUv = uv;",
+        "   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
         "}"
     ].join("\n"),
     
@@ -2138,7 +2139,53 @@ WOsu.Player.quadShader = {
         "varying vec2 vUv;",
         
         "void main() {",
-        "    gl_FragColor = texture2D(texture, vUv) * vColor;",
+        "   gl_FragColor = texture2D(texture, vUv) * vColor;",
+        "}"
+    ].join("\n")
+};
+
+WOsu.Player.cursorShader = {
+    vertexShader: [
+        "uniform float currentTime;",
+        
+        // Whether or not the cursor is hit or not
+        "uniform int isHit;",
+        // If the cursor is hit, then this is the time of the last hit
+        // Otherwise, it is the time of last release
+        "uniform float hitTime;",
+        "attribute vec4 colorMask;",
+        
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        
+        "void main() {",
+        "   float diff = (currentTime - hitTime) / 100.0;",
+        "   vec3 scaledPosition = position;",
+        "   float factor = 1.0;",
+        // Cursor has been hit (scaling up)
+        "   if (isHit == 1) {",
+        "       factor = 1.0 + clamp(diff, 0.0, 1.0) * 0.4;",
+        "   }",
+        // Cursor has been released (scaling down)
+        "   else {",
+        "       factor = 1.0 + (1.0 - clamp(diff, 0.0, 1.0)) * 0.4;",
+        "   }",
+        "   scaledPosition.x *= factor;",
+        "   scaledPosition.y *= factor;",
+        "   vColor = colorMask;",
+        "   vUv = uv;",
+        "   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "}"
+    ].join("\n"),
+    
+    fragmentShader: [
+        "uniform sampler2D texture;",
+        
+        "varying vec4 vColor;",
+        "varying vec2 vUv;",
+        
+        "void main() {",
+        "   gl_FragColor = texture2D(texture, vUv) * vColor;",
         "}"
     ].join("\n")
 };
@@ -2218,28 +2265,14 @@ WOsu.Player.circleShader = {
     ].join("\n")
 };
 
-WOsu.Player.prototype.createQuad = function(params) {
+WOsu.Player.prototype.createThreeQuad = function(params) {
     if (params.size !== undefined) {
         params.width = params.height = params.size;
     }
     
     params.color = (params.color !== undefined) ? params.color : new THREE.Vector4(1, 1, 1, 1);
 
-    var geometry = new THREE.Geometry();
-    geometry.vertices.push(
-        new THREE.Vector3(-params.width / 2.0, -params.height / 2.0, params.z),
-        new THREE.Vector3(-params.width / 2.0,  params.height / 2.0, params.z),
-        new THREE.Vector3( params.width / 2.0,  params.height / 2.0, params.z),
-        new THREE.Vector3( params.width / 2.0, -params.height / 2.0, params.z)
-    );
-    geometry.faces.push(
-        new THREE.Face3(0, 1, 2),
-        new THREE.Face3(0, 2, 3)
-    );
-    geometry.faceVertexUvs[0].push(
-        [ new THREE.Vector2(0, 0), new THREE.Vector2(0, 1), new THREE.Vector2(1, 1) ],
-        [ new THREE.Vector2(0, 0), new THREE.Vector2(1, 1), new THREE.Vector2(1, 0) ]
-    );
+    var geometry = new THREE.PlaneGeometry(params.width, params.height, 1, 1);
     
     params.texture.minFilter = THREE.LinearFilter;
     params.texture.magFilter = THREE.LinearFilter;
@@ -2271,7 +2304,6 @@ WOsu.Player.prototype.createQuad = function(params) {
     material.attributes.colorMask.value.push(
         params.color, params.color, params.color, params.color
     );
-    material.attributes.colorMask.needsUpdate = true;
     
     var mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(params.x, params.y, params.z);
@@ -2279,7 +2311,55 @@ WOsu.Player.prototype.createQuad = function(params) {
     return mesh;
 }
 
-WOsu.Player.prototype.createCircle = function(params) {
+WOsu.Player.prototype.createThreeCursor = function(params) {
+    if (params.size !== undefined) {
+        params.width = params.height = params.size;
+    }
+    
+    params.color = (params.color !== undefined) ? params.color : new THREE.Vector4(1, 1, 1, 1);
+
+    var geometry = new THREE.PlaneGeometry(params.width, params.height, 1, 1);
+    
+    params.texture.minFilter = THREE.LinearFilter;
+    params.texture.magFilter = THREE.LinearFilter;
+    var material = new THREE.ShaderMaterial({
+        uniforms: {
+            currentTime: {
+                type: 'f',
+                value: Number.NEGATIVE_INFINITY
+            },
+            isHit: {
+                type: 'i',
+                value: 0
+            },
+            hitTime: {
+                type: 'f',
+                value: Number.NEGATIVE_INFINITY
+            },
+            texture: {
+                type: 't',
+                value: params.texture
+            }
+        },
+
+        vertexShader: WOsu.Player.cursorShader.vertexShader,
+        fragmentShader: WOsu.Player.cursorShader.fragmentShader,
+
+        side: THREE.DoubleSide,
+        transparent: true,
+        blending: WOsu.Player.shader.blending,
+        blendEquation: WOsu.Player.shader.blendEquation,
+        blendSrc: WOsu.Player.shader.blendSrc,
+        blendDst: WOsu.Player.shader.blendDst
+    });
+    
+    var mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(params.x, params.y, params.z);
+    
+    return mesh;
+}
+
+WOsu.Player.prototype.createThreeCircle = function(params) {
     var obj = params.object;
     var x = obj.x - 256;
     var y = 192 - obj.y;
@@ -2361,35 +2441,31 @@ WOsu.Player.prototype.frame_game = function(time) {
 }
 
 WOsu.Player.prototype.frame_replay = function(time) {
-    return;
-    
     var rpo = this.replay; // Replay object
     var rpg = this.game.replay; // Replay game data
     var rpl = this.three.layers.replay; // Replay THREE objects
 
-    while (rpg.index < rpo.replayData.length - 1 && time > rpo.replayData[rpg.index + 1][0]) {
+    while (rpg.index < rpo.replayData.length - 1 && time > rpo.replayData[rpg.index + 1].time) {
         rpg.index++;
     }
 
+    // Get the current and next sets of replay data
     var rd = rpo.replayData[rpg.index];
-    var nd;
-    if (rpg.index == rpo.replayData.length - 1) nd = rd;
-    else nd = rpo.replayData[rpg.index + 1];
+    var nd = (rpg.index === rpo.replayData.length - 1) ? rd : rpo.replayData[rpg.index + 1];
 
-    var p1 = new THREE.Vector3(rd[1] - 256, 192 - rd[2], 0);
-    var p2 = new THREE.Vector3(nd[1] - 256, 192 - nd[2], 0);
-    var interp = (nd[0] - rd[0] == 0) ? 0 : (time - rd[0]) / (nd[0] - rd[0]);
-
+    // Transform to cartesian coordinates
+    var p1 = new THREE.Vector3(rd.x - 256, 192 - rd.y, 0);
+    var p2 = new THREE.Vector3(nd.x - 256, 192 - nd.y, 0);
+    
+    // Compute interpolation between the sets
+    var interp = (nd.time - rd.time === 0) ? 0 : (time - rd.time) / (nd.time - rd.time);
     var cursor = this.game.cursorMesh;
-    cursor.position.set(p1.x * (1 - interp) + p2.x * interp, p1.y * (1 - interp) + p2.y * interp, 0);
+    cursor.position.lerpVectors(p1, p2, interp);
 
-    var cscale = cursor.scale.x;
-    if (rd[3] > 0 && cscale < 1.4) {
-        cscale += 0.05;
-    } else if (rd[3] == 0 && cscale > 1.0) {
-        cscale -= 0.05;
-    }
-    cursor.scale.set(cscale, cscale, 1);
+    // Set cursor uniforms
+    cursor.material.uniforms.currentTime.value = time;
+    cursor.material.uniforms.isHit.value = (rd.keys > 0) ? 1 : 0;
+    cursor.material.uniforms.hitTime.value = (rd.keys > 0) ? rd.time : rd.lastReleaseTime;
 }
 WOsu.Skin = function(url) {
     this.url = url || "";
@@ -2489,54 +2565,48 @@ WOsu.SkinLoader.load = function(loc, progress) {
     var lt = this.loadedTextures = {};
     var textureList = WOsu.Skin.textureList;
 
+    // Grab an array of texture names
+    var textures = [];
+    for (var i in textureList) {
+        textures.push(i);
+    }
+    
+    var total = textures.length;
+    var loaded = 0;
+    
     function localProgress(id, tex) {
         tex.minFilter = THREE.LinearFilter;
         tex.magFilter = THREE.LinearFilter;
         instance.textures[id] = tex;
-
-        var loaded = 0;
-        var total = 0;
-        var textureList = WOsu.Skin.textureList;
-
-        for (var image in textureList) {
-            total++;
-            if (instance.textures[image] !== undefined) {
-                loaded++;
-            }
-        }
+        
+        loaded++;
 
         progress(loaded, total);
     }
-
-    for (var i in textureList) {
-        // NOTE Is there a neater way to do this
-        (function(j, loc) {
-            WOsu.async(function() {
-                // Load texture
+    
+    textures.forEach(function(t) {
+        THREE.ImageUtils.loadTexture(
+            loc + textureList[t],
+            undefined,
+            function(tex) {
+                localProgress(t, tex);
+            },
+            function(evt) {
+                // Attempt to load default skin
+                loc = WOsu.SkinLoader.defaultURL;
                 THREE.ImageUtils.loadTexture(
-                    loc + textureList[j],
+                    loc + textureList[t],
                     undefined,
                     function(tex) {
-                        localProgress(j, tex);
+                        localProgress(t, tex);
                     },
                     function(evt) {
-                        // Attempt to load default skin
-                        loc = WOsu.SkinLoader.defaultURL;
-                        THREE.ImageUtils.loadTexture(
-                            loc + textureList[j],
-                            undefined,
-                            function(tex) {
-                                localProgress(j, tex);
-                            },
-                            function(evt) {
-                                localProgress(j, undefined);
-                            }
-                        );
+                        localProgress(t, undefined);
                     }
                 );
-            });
-        })(i, loc);
-    }
+            }
+        );
+    });
 
     return instance;
 }
@@ -2648,6 +2718,15 @@ WOsu.Replay = function(json) {
     // TODO Move this index into the player, does not belong here
 }
 
+WOsu.Replay.M1 = 1;
+WOsu.Replay.M2 = 2;
+WOsu.Replay.K1 = 5;
+WOsu.Replay.K2 = 10;
+
+WOsu.Replay.hasAction = function(bits, action) {
+    return (bits & action) === action;
+}
+
 WOsu.Replay.prototype.constructor = WOsu.Replay;
 WOsu.ReplayLoader = {};
 
@@ -2723,34 +2802,25 @@ WOsu.ReplayLoader.loadRaw = function(data, finish, progress) {
         var parts;
 
         var time = 0;
-        var bits, actionBits;
-        var M1 = 1,
-            M2 = 2,
-            K1 = 5,
-            K2 = 10;
+        var lastReleaseTime = Number.NEGATIVE_INFINITY;
+        var keys;
 
         for (var i = 0; i < lines.length; i++) {
             parts = lines[i].split("|");
             time += parseInt(parts[0]);
-            bits = parseInt(parts[3]);
-            actionBits = 0;
-            if ((bits & K2) == K2) {
-                actionBits |= K2;
-                bits &= ~K2;
+            keys = parseInt(parts[3]);
+            // If falling edge then reset the last release time
+            if (i > 0 && replay.replayData[i-1].keys > 0 && keys === 0) {
+                lastReleaseTime = time;
             }
-            if ((bits & K1) == K1) {
-                actionBits |= K1;
-                bits &= ~K1;
-            }
-            if ((bits & M2) == M2) {
-                actionBits |= M2;
-                bits &= ~M2;
-            }
-            if ((bits & M1) == M1) {
-                actionBits |= M1;
-                bits &= ~M1;
-            }
-            replay.replayData.push([time, parseFloat(parts[1]), parseFloat(parts[2]), actionBits]);
+            
+            replay.replayData.push({
+                time: time,
+                x: parseFloat(parts[1]),
+                y: parseFloat(parts[2]),
+                keys: keys,
+                lastReleaseTime: lastReleaseTime
+            });
         }
     }
 
