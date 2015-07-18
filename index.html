@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -431,7 +432,7 @@
                     var input =
                         $(document.createElement("input"))
                         .attr("type", "text")
-                        .val("http://localhost:9678")
+                        .val(location.protocol + "//" + location.hostname + ":5000")
                         .css({
                             "width": "400px",
                         });
@@ -717,7 +718,7 @@
                 (options.replayUpload.value[0].value == "") ? "url" : "file";
 
             var replayData =
-                (replayType == "file") ? options.replayUpload.value[0].value : (options.replayURL.value[0].value ? options.replayURL.value[0].value : sample_prefix + options.replaySelect.value[0].value);
+                (replayType == "file") ? options.replayUpload.value[0] : (options.replayURL.value[0].value ? options.replayURL.value[0].value : sample_prefix + options.replaySelect.value[0].value);
 
             var skinData =
                 (options.skinURL.value[0].value == "") ? options.skinSelect.value[0].value : options.skinURL.value[0].value;
