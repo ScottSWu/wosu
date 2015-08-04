@@ -42,7 +42,7 @@ WOsu.resync = function(instance, funcs, callback) {
         }
     };
     
-    funcs.map(function(o) {
+    funcs.forEach(function(o) {
         o.args = o.args || [];
         WOsu.async(function() {
             o.args.unshift(finish);
@@ -51,489 +51,7 @@ WOsu.resync = function(instance, funcs, callback) {
     });
 }
 
-// ==== Creation functions =====
-
-WOsu.create_beat = function(cobj, offset, color, mechanics, textures) {
-    var vecColor = new THREE.Vector4(color[0], color[1], color[2], 0);
-    var vecWhite = new THREE.Vector4(1, 1, 1, 0);
-    var objs = {};
-
-    objs._main = new THREE.Object3D();
-    objs._main.position.set(cobj.x + offset.x - 256, 192 - cobj.y - offset.y, offset.z);
-
-    objs.hitcircle = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0,
-        size: mechanics.CS * 0.95,
-        color: vecColor,
-        texture: textures.hitcircle
-    });
-
-    objs.hitcircle_overlay = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.1,
-        size: mechanics.CS,
-        color: vecWhite,
-        texture: textures.hitcircle_overlay
-    });
-
-    objs.approachcircle = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.3,
-        size: mechanics.CS,
-        color: vecColor,
-        texture: textures.approachcircle
-    });
-
-    objs._lighting = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.2,
-        size: mechanics.CS,
-        color: vecColor,
-        texture: textures.lighting
-    });
-
-    WOsu.create_number_meshes({
-        object: objs,
-        number: cobj.comboNumber,
-        x: 0,
-        y: 0,
-        z: 0.2,
-        size: mechanics.CS / 2,
-        color: vecWhite,
-        textures: textures,
-        prefix: "default"
-    });
-
-    objs.approachcircle.scale.set(3, 3, 1);
-
-    for (var i in objs)
-        if (i != "_main") objs._main.add(objs[i]);
-
-    return objs;
-}
-
-WOsu.create_slider = function(cobj, offset, color, mechanics, textures) {
-    var vecColor = new THREE.Vector4(color[0], color[1], color[2], 0);
-    var vecWhite = new THREE.Vector4(1, 1, 1, 0);
-    var objs = {};
-
-    cobj.generateBezier();
-
-    objs._main = new THREE.Object3D();
-    objs._main.position.set(cobj.x + offset.x - 256, 192 - cobj.y - offset.y, offset.z);
-
-    objs.hitcircle = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0,
-        size: mechanics.CS * 0.95,
-        color: vecColor,
-        texture: textures.hitcircle
-    });
-
-    objs.hitcircle_overlay = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.1,
-        size: mechanics.CS,
-        color: vecWhite,
-        texture: textures.hitcircle_overlay
-    });
-
-    objs.hitcircle_repeat = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.15,
-        size: mechanics.CS,
-        color: vecWhite,
-        texture: textures.reversearrow
-    });
-
-    objs.approachcircle = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.3,
-        size: mechanics.CS,
-        color: vecColor,
-        texture: textures.approachcircle
-    });
-
-    objs.endcircle = WOsu.create_quad_mesh({
-        x: cobj.endX - cobj.x,
-        y: -cobj.endY + cobj.y,
-        z: -0.2,
-        size: mechanics.CS * 0.95,
-        color: vecColor,
-        texture: textures.hitcircle
-    });
-
-    objs.endcircle_overlay = WOsu.create_quad_mesh({
-        x: cobj.endX - cobj.x,
-        y: -cobj.endY + cobj.y,
-        z: -0.1,
-        size: mechanics.CS,
-        color: vecWhite,
-        texture: textures.hitcircle_overlay
-    });
-
-    objs.endcircle_repeat = WOsu.create_quad_mesh({
-        x: cobj.endX - cobj.x,
-        y: -cobj.endY + cobj.y,
-        z: -0.05,
-        size: mechanics.CS,
-        color: vecWhite,
-        texture: textures.reversearrow
-    });
-
-    objs.slider = WOsu.create_curve_mesh({
-        x: 0,
-        y: 0,
-        z: -0.4,
-        size: mechanics.CS / 2 * 0.95,
-        color: vecColor,
-        texture: textures.hitcircle,
-        object: cobj
-    });
-
-    objs.slider_overlay = WOsu.create_curve_mesh({
-        x: 0,
-        y: 0,
-        z: -0.3,
-        size: mechanics.CS / 2,
-        color: vecWhite,
-        texture: textures.hitcircle_overlay,
-        object: cobj
-    });
-
-    objs.slider_ball = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.3,
-        size: mechanics.CS,
-        color: vecWhite,
-        texture: textures.slider_b
-    });
-
-    objs.slider_follow = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.35,
-        size: mechanics.CS * 2,
-        color: vecWhite,
-        texture: textures.slider_followcircle
-    });
-
-    objs._lighting = WOsu.create_quad_mesh({
-        x: (cobj.repeats % 2 == 0) ? cobj.endX - cobj.x : 0,
-        y: (cobj.repeats % 2 == 0) ? -cobj.endY + cobj.y : 0,
-        z: 0.2,
-        size: mechanics.CS,
-        color: vecColor,
-        texture: textures.lighting
-    });
-
-    WOsu.create_number_meshes({
-        object: objs,
-        number: cobj.comboNumber,
-        x: 0,
-        y: 0,
-        z: 0.2,
-        size: mechanics.CS / 2,
-        color: vecWhite,
-        textures: textures,
-        prefix: "default"
-    });
-
-    objs.approachcircle.scale.set(3, 3, 1);
-    objs.hitcircle_repeat.visible = false;
-    objs.endcircle_repeat.visible = false;
-
-    for (var i in objs)
-        if (i != "_main") objs._main.add(objs[i]);
-
-    return objs;
-}
-
-WOsu.create_spinner = function(cobj, offset, color, mechanics, textures) {
-    var vecWhite = new THREE.Vector4(1, 1, 1, 0);
-    var objs = {};
-
-    objs._main = new THREE.Object3D();
-    objs._main.position.set(cobj.x - 256, 192 - cobj.y, offset.z);
-
-    objs.spinner_background = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0,
-        width: 640,
-        height: 480,
-        color: vecWhite,
-        texture: textures.spinner_background
-    });
-
-    objs.spinner_circle = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.1,
-        size: 480,
-        color: vecWhite,
-        texture: textures.spinner_circle
-    });
-
-    objs.spinner_metre = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.2,
-        width: 640,
-        height: 480,
-        color: vecWhite,
-        texture: textures.spinner_metre
-    });
-
-    objs.spinner_approachcircle = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.3,
-        size: 480,
-        color: vecWhite,
-        texture: textures.spinner_approachcircle
-    });
-
-    objs._lighting = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0.2,
-        size: mechanics.CS,
-        color: vecWhite,
-        texture: textures.lighting
-    });
-
-    //objs._main.add(objs.spinner_background);
-    objs._main.add(objs.spinner_circle);
-    //objs._main.add(objs.spinner_metre);
-    objs._main.add(objs.spinner_approachcircle);
-    objs._main.add(objs._lighting);
-    //for (var i in objs) if (i!="_main") objs._main.add(objs[i]);
-
-    return objs;
-}
-
-WOsu.create_cursor = function(textures) {
-    var vecWhite = new THREE.Vector4(1, 1, 1, 1);
-    var objs = {};
-
-    objs._main = new THREE.Object3D();
-    objs._main.position.set(0, 0, 0);
-
-    objs.cursor = WOsu.create_quad_mesh({
-        x: 0,
-        y: 0,
-        z: 0,
-        size: 32,
-        color: vecWhite,
-        texture: textures.cursor
-    });
-
-    objs._main.add(objs.cursor);
-
-    return objs;
-}
-
-WOsu.create_quad_mesh = function(params) {
-    if (params.size != undefined) {
-        params.width = params.height = params.size;
-    }
-
-    var uniforms = {
-        texture: {
-            type: 't',
-            value: params.texture
-        }
-    };
-    var mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(params.width, params.height, 1, 1),
-        new THREE.ShaderMaterial({
-            uniforms: uniforms,
-
-            vertexShader: WOsu.shader.vertexShader,
-            fragmentShader: WOsu.shader.fragmentShader,
-
-            side: THREE.DoubleSide,
-            blending: WOsu.shader.blending,
-            transparent: true
-        })
-    );
-
-    for (var j = 0; j < mesh.geometry.vertices.length; j++) {
-        attributes.wosuColor.value[j] = params.color;
-    }
-
-    mesh.attributes = attributes;
-    mesh.uniforms = uniforms;
-    mesh.position.set(params.x, params.y, params.z);
-
-    return mesh;
-}
-
-WOsu.create_curve_mesh = function(params) {
-    var attributes = {
-        wosuColor: {
-            type: 'v4',
-            value: []
-        }
-    };
-    var uniforms = {
-        texture: {
-            type: 't',
-            value: params.texture
-        }
-    };
-    var geometry = WOsu.create_curve_geometry(
-        params.object.curveX,
-        params.object.curveY,
-        params.object.x,
-        params.object.y,
-        params.size
-    );
-    var mesh = new THREE.Mesh(
-        geometry,
-        //new THREE.MeshBasicMaterial({ color : carr[0]*0x10000+carr[1]*0x100+carr[2] , map : WOsu.textures.skin.hitcircle , transparent : false })/*
-        new THREE.ShaderMaterial({
-            attributes: attributes,
-            uniforms: uniforms,
-
-            vertexShader: WOsu.alphaShader.vertexShader,
-            fragmentShader: WOsu.alphaShader.fragmentShader,
-
-            side: THREE.DoubleSide,
-            blending: WOsu.alphaShader.blending,
-            transparent: true
-        })
-        //*/
-    );
-
-    for (var j = 0; j < mesh.geometry.vertices.length; j++) {
-        attributes.wosuColor.value[j] = params.color;
-    }
-
-    mesh.attributes = attributes;
-    mesh.uniforms = uniforms;
-    mesh.position.set(params.x, params.y, params.z);
-
-    return mesh;
-}
-
-WOsu.create_curve_geometry = function(cx, cy, ox, oy, size) {
-    var geometry = new THREE.Geometry();
-
-    var bisectors = new Array(cx.length - 2);
-    var angle, lastAngle = undefined,
-        offset = 0;
-    for (var i = 0; i < cx.length - 2; i++) {
-        var a1 = Math.atan2(cy[i + 1] - cy[i], cx[i] - cx[i + 1]);
-        var a2 = Math.atan2(cy[i + 1] - cy[i + 2], cx[i + 2] - cx[i + 1]);
-        var angle = (a1 + a2) / 2;
-        if (lastAngle != undefined) {
-            if (Math.abs((angle + offset - lastAngle) % (2 * Math.PI)) > Math.PI / 2) {
-                offset += Math.PI;
-            }
-        }
-        lastAngle = angle + offset;
-        bisectors[i] = new THREE.Vector3(size * Math.cos(lastAngle), size * Math.sin(lastAngle), 0);
-    }
-
-    var bisector, lastb = bisectors[0],
-        winding = false;
-    var offset = new THREE.Vector3(0, size, 0);
-    for (var i = 0; i < cx.length; i++) {
-        if (i == 0) bisector = bisectors[0];
-        else if (i == cx.length - 1) bisector = bisectors[i - 2];
-        else bisector = bisectors[i - 1];
-
-        var curve = new THREE.Vector3(cx[i] - ox, oy - cy[i], 0);
-
-        geometry.vertices.push(curve.clone().add(bisector));
-        geometry.vertices.push(curve.clone().sub(bisector));
-    }
-
-    var normal = new THREE.Vector3(0, 0, 1);
-    var uvl = new THREE.Vector2(0.5, 0);
-    var uvr = new THREE.Vector2(0.5, 1);
-    var face;
-    for (var i = 0; i < cx.length - 1; i++) {
-        face = new THREE.Face3(2 * i, 2 * i + 1, 2 * i + 2);
-        face.normal.copy(normal);
-        face.vertexNormals.push(normal.clone(), normal.clone(), normal.clone());
-
-        geometry.faces.push(face);
-        geometry.faceVertexUvs[0].push([uvl.clone(), uvr.clone(), uvl.clone()]);
-
-        face = new THREE.Face3(2 * i + 1, 2 * i + 2, 2 * i + 3);
-        face.normal.copy(normal);
-        face.vertexNormals.push(normal.clone(), normal.clone(), normal.clone());
-
-        geometry.faces.push(face);
-        geometry.faceVertexUvs[0].push([uvr.clone(), uvl.clone(), uvr.clone()]);
-    }
-
-    geometry.computeCentroids();
-    geometry.computeBoundingBox();
-
-    return geometry;
-}
-
-WOsu.create_number_meshes = function(params) {
-    if (params.number < 10) {
-        var d1 = ~~ (params.number);
-
-        var tex = params.textures[params.prefix + "_" + d1];
-        var scale = tex.image.width / tex.image.height * params.size;
-        params.object.digit1 = WOsu.create_quad_mesh({
-            x: params.x,
-            y: params.y,
-            z: params.z,
-            width: scale,
-            height: params.size,
-            color: params.color,
-            texture: tex
-        });
-    } else if (params.number < 100) {
-        var d1 = ~~ (params.number / 10);
-        var d2 = ~~ (params.number % 10);
-
-        var tex1 = params.textures[params.prefix + "_" + d1];
-        var scale1 = tex1.image.width / tex1.image.height * params.size;
-        var tex2 = params.textures[params.prefix + "_" + d2];
-        var scale2 = tex2.image.width / tex2.image.height * params.size;
-        var midpoint = (scale2 - scale1) / 2;
-
-        params.object.digit1 = WOsu.create_quad_mesh({
-            x: params.x - scale2 / 2,
-            y: params.y,
-            z: params.z,
-            width: scale1,
-            height: params.size,
-            color: params.color,
-            texture: tex1
-        });
-
-        params.object.digit2 = WOsu.create_quad_mesh({
-            x: params.x + scale1 / 2,
-            y: params.y,
-            z: params.z,
-            width: scale2,
-            height: params.size,
-            color: params.color,
-            texture: tex2
-        });
-    }
-}
-WOsu.Beatmap = function() {
+WOsu.Beatmap = function () {
     this.BeatmapData = new WOsu.BeatmapData();
     this.BeatmapEvents = new WOsu.BeatmapEvents();
     this.BeatmapObjects = new WOsu.BeatmapObjects();
@@ -543,44 +61,143 @@ WOsu.Beatmap = function() {
 WOsu.Beatmap.prototype.constructor = WOsu.Beatmap;
 
 WOsu.Beatmap.mods = {
-    NoFail: 1 << 0,
-    Easy: 1 << 1,
-    NoVideo: 1 << 2,
-    Hidden: 1 << 3,
-    HardRock: 1 << 4,
-    SuddenDeath: 1 << 5,
-    DoubleTime: 1 << 6,
-    Relax: 1 << 7,
-    HalfTime: 1 << 8,
-    Nightcore: 1 << 9,
-    Flashlight: 1 << 10,
-    Autoplay: 1 << 11,
-    SpunOut: 1 << 12,
-    Autopilot: 1 << 13,
-    Perfect: 1 << 14,
-    Key4: 1 << 15,
-    Key5: 1 << 16,
-    Key6: 1 << 17,
-    Key7: 1 << 18,
-    Key8: 1 << 19,
-    FadeIn: 1 << 20,
-    Random: 1 << 21,
-    Cinema: 1 << 22,
-    Key9: 1 << 23,
-    Key10: 1 << 24,
-    Key1: 1 << 25,
-    Key3: 1 << 26,
-    Key2: 1 << 27
+    NoFail: {
+        mask: 1 << 0,
+        multiplier: 0.5
+    },
+    Easy: {
+        mask: 1 << 1,
+        multiplier: 0.5
+    },
+    NoVideo: {
+        mask: 1 << 2,
+        multiplier: 1.0
+    },
+    Hidden: {
+        mask: 1 << 3,
+        multiplier: 1.06
+    },
+    HardRock: {
+        mask: 1 << 4,
+        multiplier: 1.06
+    },
+    SuddenDeath: {
+        mask: 1 << 5,
+        multiplier: 1.0
+    },
+    DoubleTime: {
+        mask: 1 << 6,
+        multiplier: 1.12
+    },
+    Relax: {
+        mask: 1 << 7,
+        multiplier: 0.0
+    },
+    HalfTime: {
+        mask: 1 << 8,
+        multiplier: 0.3
+    },
+    Nightcore: {
+        mask: 1 << 9,
+        multiplier: 1.12
+    },
+    Flashlight: {
+        mask: 1 << 10,
+        multiplier: 1.12
+    },
+    Autoplay: {
+        mask: 1 << 11,
+        multiplier: 0.0
+    },
+    SpunOut: {
+        mask: 1 << 12,
+        multiplier: 0.9
+    },
+    Autopilot: {
+        mask: 1 << 13,
+        multiplier: 0.0
+    },
+    Perfect: {
+        mask: 1 << 14,
+        multiplier: 1.0
+    },
+    // TODO Multipliers for keys
+    Key4: {
+        mask: 1 << 15,
+        multiplier: 1.0
+    },
+    Key5: {
+        mask: 1 << 16,
+        multiplier: 1.0
+    },
+    Key6: {
+        mask: 1 << 17,
+        multiplier: 1.0
+    },
+    Key7: {
+        mask: 1 << 18,
+        multiplier: 1.0
+    },
+    Key8: {
+        mask: 1 << 19,
+        multiplier: 1.0
+    },
+    FadeIn: {
+        mask: 1 << 20,
+        multiplier: 1.0
+    },
+    Random: {
+        mask: 1 << 21,
+        multiplier: 1.0
+    },
+    Cinema: {
+        mask: 1 << 22,
+        multiplier: 1.0
+    },
+    Key9: {
+        mask: 1 << 23,
+        multiplier: 1.0
+    },
+    Key10: {
+        mask: 1 << 24,
+        multiplier: 1.0
+    },
+    Key1: {
+        mask: 1 << 25,
+        multiplier: 1.0
+    },
+    Key3: {
+        mask: 1 << 26,
+        multiplier: 1.0
+    },
+    Key2: {
+        mask: 1 << 27,
+        multiplier: 1.0
+    }
 };
 
-WOsu.Beatmap.hasMod = function(mods, mod) {
-    return (mods & mod) == mod;
+WOsu.Beatmap.hasMod = function (mods, mod) {
+    return (mods & mod.mask) == mod.mask;
+};
+
+/**
+    Get the timing point at a given time.
+*/
+WOsu.Beatmap.prototype.getTimingPoint = function (time) {
+    var current = 0;
+    var points = this.BeatmapEvents.TimingPoints;
+    while (current < points.length - 1 && points[current + 1].time <= time) {
+        current++;
+    }
+    return points[current];
 }
 
 /**
     Compute technical details of the beatmap (with mods).
 */
-WOsu.Beatmap.prototype.calculate = function(mods) {
+WOsu.Beatmap.prototype.loadMechanics = function (mods) {
+    mods = (mods === undefined) ? 0 : mods;
+
     var bm = this.BeatmapMechanics;
     var bd = this.BeatmapData;
 
@@ -588,6 +205,22 @@ WOsu.Beatmap.prototype.calculate = function(mods) {
     var ar = bd.ApproachRate;
     var cs = bd.CircleSize;
     var od = bd.OverallDifficulty;
+    var hp = bd.HPDrainRate;
+
+    // Compute total difficulty
+    bm.difficulty = cs + od + hp;
+    bm.difficultyMultiplier = [6, 13, 18, 25, 31].reduce(function (p, c) {
+        return (bm.difficulty > c) ? p + 1 : p;
+    }, 2);
+
+    // Compute mod multipliers
+    for (var mod in WOsu.Beatmap.mods) {
+        if (WOsu.Beatmap.hasMod(mods, mod)) {
+            bm.modMultiplier *= mod.multiplier;
+        }
+    }
+
+    // Adjust difficulty for mods
     if (WOsu.Beatmap.hasMod(mods, WOsu.Beatmap.mods.HardRock)) {
         ar = ar * 1.4;
         od = od * 1.4;
@@ -597,13 +230,17 @@ WOsu.Beatmap.prototype.calculate = function(mods) {
         if (od > 10) {
             od = 10;
         }
-    } else if (WOsu.Beatmap.hasMod(mods, WOsu.Beatmap.mods.Easy)) {
+    }
+    else if (WOsu.Beatmap.hasMod(mods, WOsu.Beatmap.mods.Easy)) {
         ar = ar * 0.5;
     }
 
     bm.AR = (ar <= 5) ? 1800 - ar * 120 : 1200 - (ar - 5) * 150;
-    bm.CS = 140 - 15 * cs;
+    bm.CS = (140 - 15 * cs) / 2.0;
     bm.OD = 200 - od * 10;
+    bm.hit300 = 80 - od * 6;
+    bm.hit100 = 140 - od * 8;
+    bm.hit50 = 200 - od * 10;
 
     var be = this.BeatmapEvents;
     bm.minBPM = -1;
@@ -630,6 +267,24 @@ WOsu.Beatmap.prototype.calculate = function(mods) {
         [0xFF, 0xFF, 0x80]
     ];
 }
+
+/**
+    Compute all game events.
+*/
+WOsu.Beatmap.prototype.loadEvents = function () {
+    var bm = this.BeatmapMechanics;
+    var bo = this.BeatmapObjects;
+
+    for (var i = 0; i < bo.length; i++) {
+        bm.events = bm.events.concat(WOsu.GameEvent.getEvents(bo[i]));
+    }
+
+    // Sort events in order
+    bm.events.sort(function (a, b) {
+        return a.time - b.time;
+    });
+}
+
 WOsu.BeatmapLoader = {};
 
 WOsu.BeatmapLoader.sectionKeys = [
@@ -818,9 +473,6 @@ WOsu.BeatmapLoader.load = function(text) {
             }
         }
     }
-    
-    // Technical calculations
-    map.calculate();
 
     return map;
 }
@@ -866,17 +518,17 @@ WOsu.BeatmapData = function() {
 
 WOsu.BeatmapEvents = function() {
 	// Events
-	this.BackgroundEvents = new Array();
-	this.BreakPeriods = new Array();
-	this.StoryboardObjects = new Array();
+	this.BackgroundEvents = [];
+	this.BreakPeriods = [];
+	this.StoryboardObjects = [];
 	this.hasExternalStoryboard = false;
 	this.hasStoryboardBackground = false;
 	
 	// Timing Points
-	this.TimingPoints = new Array();
+	this.TimingPoints = [];
 	
 	// Colours
-	this.Colours = new Array();
+	this.Colours = [];
 }
 
 WOsu.BeatmapObjects = function() {
@@ -889,12 +541,28 @@ WOsu.BeatmapObjects.prototype = Object.create( Array.prototype );
     A structure containing technical mechanic values.
 */
 WOsu.BeatmapMechanics = function() {
+    // Difficulties in milliseconds
     this.AR = 0;
     this.CS = 0;
     this.OD = 0;
+    this.hit300 = 0;
+    this.hit100 = 0;
+    this.hit50 = 0;
+    
+    // Total difficulty score multiplier
+    this.difficulty = 0;
+    this.difficultyMultiplier = 1;
+    this.modMultiplier = 1;
+    
+    // Beats per minute (as opposed to milliseconds per beat)
     this.minBPM = 0;
     this.maxBPM = 1;
+    
+    // Combo colors
     this.colors = [];
+    
+    // Game hit events
+    this.events = [];
 }
 
 WOsu.BeatmapMechanics.prototype.constructor = WOsu.BeatmapMechanics;
@@ -1319,49 +987,52 @@ WOsu.StoryboardObject.prototype.getNumberImages = function() {
 	return this.frameCount;
 }
 
-WOsu.TimingPoint = function(parent,line) {
-	this.parseParts = null;
-	
-	this.map = parent;
-	this.time = 0;
-	this.bpm = 0;	// This is actually like milliseconds per beat or something.
-					// Removes the need to divide when calculating slider speeds.
-	this.meter = 4;
-	this.sampletype = 0;
-	this.sampleset = 0;
-	this.volume = 0;
-	this.inherited = false;
-	this.negativeBPM = false;
-	this.ki = false;
-	
-	this.parse(line);
+WOsu.TimingPoint = function (parent, line) {
+    this.parseParts = null;
+
+    this.map = parent;
+    this.time = 0;
+    this.bpm = 0; // This is actually like milliseconds per beat
+    this.ratio = 1.0;
+    // Removes the need to divide when calculating slider speeds.
+    this.meter = 4;
+    this.sampletype = 0;
+    this.sampleset = 0;
+    this.volume = 0;
+    this.inherited = false;
+    this.negativeBPM = false;
+    this.ki = false;
+
+    this.parse(line);
 }
 
 WOsu.TimingPoint.prototype.constructor = WOsu.TimingPoint;
 
-WOsu.TimingPoint.prototype.parse = function(line) {
-	this.parseParts = line.split(",");
-	
-	this.time = parseInt(this.parseParts[0]);
-	this.bpm = parseFloat(this.parseParts[1]);
-	this.meter = parseInt(this.parseParts[2]);
-	this.sampletype = parseInt(this.parseParts[3]);
-	this.sampleset = parseInt(this.parseParts[4]);
-	this.volume = parseFloat(this.parseParts[5]);
-	this.inherited = (this.parseParts[6]=="0") ? true : false;
-	this.ki = (this.parseParts[7]=="0") ? true : false;
-	
-	if (this.bpm<0) {
-		this.negativeBPM = true;
-		var tp = this.map.BeatmapEvents.TimingPoints;
-		for (var i=tp.length-1; i>=0; i--) {
-			if (!tp[i].negativeBPM && tp[i].time<=this.time) {
-				this.bpm = -this.bpm/100.0 * tp[i].bpm;
-				break;
-			}
-		}
-	}
+WOsu.TimingPoint.prototype.parse = function (line) {
+    this.parseParts = line.split(",");
+
+    this.time = parseInt(this.parseParts[0]);
+    this.bpm = parseFloat(this.parseParts[1]);
+    this.meter = parseInt(this.parseParts[2]);
+    this.sampletype = parseInt(this.parseParts[3]);
+    this.sampleset = parseInt(this.parseParts[4]);
+    this.volume = parseFloat(this.parseParts[5]);
+    this.inherited = (this.parseParts[6] == "0") ? true : false;
+    this.ki = (this.parseParts[7] == "0") ? true : false;
+
+    if (this.bpm < 0) {
+        this.negativeBPM = true;
+        var tp = this.map.BeatmapEvents.TimingPoints;
+        for (var i = tp.length - 1; i >= 0; i--) {
+            if (!tp[i].negativeBPM && tp[i].time <= this.time) {
+                this.ratio = -100.0 / this.bpm;
+                this.bpm = -this.bpm / 100.0 * tp[i].bpm;
+                break;
+            }
+        }
+    }
 }
+
 WOsu.ColourEvent = function(line) {
 	WOsu.Event.call(this,line);
 	
@@ -1381,189 +1052,336 @@ WOsu.ColourEvent.prototype.parseColourEvent = function(line) {
 	this.g = parseInt(this.parseParts[3]);
 	this.b = parseInt(this.parseParts[4]);
 }
-WOsu.HitObject = function(map,line) {
-	this.parseParts = null;
-	
-	this.map = map;
-	this.x = 0; // X coordinate (0-512)
-	this.y = 0; // Y coordinate (0-392)
-	this.endX = this.x;
-	this.endY = this.y;
-	this.time = 0; // Milliseconds after the beginning of the song
-	this.endTime = 0;
-	this.type; // Bit (3,2,1,0) -> (Spinner,New combo,Slider,Beat)
-	this.combo = 0; // Combo color
-	this.comboNumber = 1; // Combo number
-	this.hitsound = 0; // Hit sound; Bit (3,2,1,0) -> (Clap,Finish,Whistle,Normal)
-	
-	this.parse(line);
+/**
+    Handle game events and links multiple game events together.
+*/
+WOsu.GameEvent = function (type, time, x, y, gameObject, parent) {
+    this.type = type;
+    this.time = time;
+    this.x = x;
+    this.y = y;
+    this.gameObject = gameObject;
+    this.parent = (parent === undefined) ? this : parent;
+    this.data = {};
 }
 
-WOsu.HitObject.getObject = function(map,line) {
-	var t = new WOsu.HitObject(map,line);
-	if ((t.type & 8)==8) {
-		t = new WOsu.SpinnerObject(map,line);
-	}
-	else if ((t.type & 2)==2) {
-		t = new WOsu.SliderObject(map,line);
-	}
-	return t;
+WOsu.GameEvent.getEvents = function (obj) {
+    var events = [];
+    if (obj.isCircle()) {
+
+        // Only one event for circles
+        var parent = new WOsu.GameEvent(WOsu.GameEvent.TYPE_CIRCLE, obj.time, obj.x, obj.y, obj);
+        events.push(parent);
+
+    }
+    else if (obj.isSlider()) {
+
+        // Slider start
+        var parent = new WOsu.GameEvent(WOsu.GameEvent.TYPE_SLIDER_START, obj.time, obj.x, obj.y, obj);
+        events.push(parent);
+        
+        // Slider end
+        events.push(new WOsu.GameEvent(WOsu.GameEvent.TYPE_SLIDER_END, obj.endTime, obj.endX, obj.endY, obj, parent));
+        
+        // Slider ticks
+        var offsetTime = obj.time;
+        for (var i = 0; i < obj.repeats; i++) {
+            for (var j = 0; j < obj.ticks.length; j++) {
+                // TODO Use slider.getPosition instead
+                // Interpolation
+                var t = obj.ticks[j];
+                if (i % 2 == 0) {
+                    t = 1.0 - t;
+                }
+                // Positional interpolation
+                var ti = t * obj.curveLength;
+                if (ti < 0) { // Clamp to the array size
+                    ti = 0;
+                }
+                else if (ti >= obj.curveLength) {
+                    ti = obj.curveLength - 1;
+                }
+                events.push(new WOsu.GameEvent(WOsu.GameEvent.TYPE_SLIDER_TICK, offsetTime + t * obj.curveTime, obj.curveX[ti], obj.curveY[ti], obj, parent));
+            }
+            offsetTime += obj.curveTime;
+        }
+        
+        // Slider repeats
+        offsetTime = obj.time;
+        for (var i = 1; i < obj.repeats; i++) {
+            offsetTime += obj.curveTime;
+            
+            // Repeat
+            if (i % 2 == 0) { // Repeat at the beginning
+                events.push(new WOsu.GameEvent(WOsu.GameEvent.TYPE_SLIDER_REPEAT, offsetTime, obj.x, obj.y, obj, parent));
+            }
+            else { // Repeat at the end
+                events.push(new WOsu.GameEvent(WOsu.GameEvent.TYPE_SLIDER_REPEAT, offsetTime, obj.endX, obj.endY, obj, parent));
+            }
+        }
+
+        // Whether or not the slider is held or not
+        parent.data.hold = false;
+        // Total combo points
+        parent.data.hit = 0;
+        parent.data.total = events.length;
+
+    }
+    else if (obj.isSpinner()) {
+
+        // Spinner start
+        var parent = new WOsu.GameEvent(WOsu.GameEvent.TYPE_SPINNER_START, obj.time, obj.x, obj.y, obj);
+        events.push(parent);
+        // Spinner end
+        events.push(new WOsu.GameEvent(WOsu.GameEvent.TYPE_SPINNER_END, obj.endTime, obj.x, obj.y, obj, parent));
+        
+        parent.data.spins = 0;
+
+    }
+    return events;
+}
+
+WOsu.GameEvent.prototype.constructor = WOsu.GameEvent;
+
+WOsu.GameEvent.prototype.isType = function (type) {
+    return (this.type & type) == type;
+}
+
+WOsu.GameEvent.TYPE_NONE = 0;
+WOsu.GameEvent.TYPE_CIRCLE = 1;
+
+WOsu.GameEvent.TYPE_SLIDER = 2;
+WOsu.GameEvent.TYPE_SLIDER_POINT = 2 + 4;
+WOsu.GameEvent.TYPE_SLIDER_START = 2 + 4 + 8;
+WOsu.GameEvent.TYPE_SLIDER_END = 2 + 4 + 16;
+WOsu.GameEvent.TYPE_SLIDER_REPEAT = 2 + 4 + 32;
+WOsu.GameEvent.TYPE_SLIDER_TICK = 2 + 64;
+
+WOsu.GameEvent.TYPE_SPINNER = 128;
+WOsu.GameEvent.TYPE_SPINNER_START = 128 + 256;
+WOsu.GameEvent.TYPE_SPINNER_END = 128 + 512;
+
+WOsu.HitObject = function(map, line) {
+    this.parseParts = null;
+
+    this.map = map;
+    this.x = 0; // X coordinate (0-512)
+    this.y = 0; // Y coordinate (0-392)
+    this.endX = this.x;
+    this.endY = this.y;
+    this.time = 0; // Milliseconds after the beginning of the song
+    this.endTime = 0;
+    this.type; // Bit (3,2,1,0) -> (Spinner,New combo,Slider,Beat)
+    this.combo = 0; // Combo color
+    this.comboNumber = 1; // Combo number
+    this.hitsound = 0; // Hit sound; Bit (3,2,1,0) -> (Clap,Finish,Whistle,Normal)
+
+    this.parse(line);
+}
+
+WOsu.HitObject.getObject = function(map, line) {
+    var t = new WOsu.HitObject(map, line);
+    if (t.isCircle()) {
+        t = new WOsu.CircleObject(map, line);
+    } else if (t.isSlider()) {
+        t = new WOsu.SliderObject(map, line);
+    } else if (t.isSpinner()) {
+        t = new WOsu.SpinnerObject(map, line);
+    }
+    return t;
 }
 
 WOsu.HitObject.prototype.constructor = WOsu.HitObject;
 
 WOsu.HitObject.prototype.parse = function(line) {
-	this.parseParts = line.split(",");
-	this.x = parseInt(this.parseParts[0]);
-	this.y = parseInt(this.parseParts[1]);
-	this.time = parseInt(this.parseParts[2]);
-	this.type = parseInt(this.parseParts[3]);
-	this.hitsound = parseInt(this.parseParts[4]);
-	
-	this.endX = this.x;
-	this.endY = this.y;
-	this.endTime = this.time;
+    this.parseParts = line.split(",");
+    this.x = parseInt(this.parseParts[0]);
+    this.y = parseInt(this.parseParts[1]);
+    this.time = parseInt(this.parseParts[2]);
+    this.type = parseInt(this.parseParts[3]);
+    this.hitsound = parseInt(this.parseParts[4]);
+
+    this.endX = this.x;
+    this.endY = this.y;
+    this.endTime = this.time;
 }
 
-WOsu.HitObject.prototype.isBeat = function() {
-	return (this.type & 1)==1;
+WOsu.HitObject.prototype.isCircle = function() {
+    return (this.type & 1) == 1;
 }
 
 WOsu.HitObject.prototype.isSlider = function() {
-	return (this.type & 2)==2;
+    return (this.type & 2) == 2;
 }
 
 WOsu.HitObject.prototype.isComboChange = function() {
-	return (this.type & 4)==4;
+    return (this.type & 4) == 4;
 }
 
 WOsu.HitObject.prototype.isSpinner = function() {
-	return (this.type & 8)==8;
+    return (this.type & 8) == 8;
 }
-WOsu.SliderObject = function(map,line) {
-	WOsu.HitObject.call(this,map,line);
-	
-	this.controlX = new Array(0); // Control X coordinates of the slider
-	this.controlY = new Array(0); // Control Y coordinates of the slider
-	this.repeats = 0; // Repeats
-	this.curveX = new Array(0); // Generated curve point X coordinates
-	this.curveY = new Array(0); // Generated curve point Y coordinates
-	this.sliderSpeed = 0; // Slider speed (osupixels)
-	this.sliderLength = 0; // Slider length (pixels)
-	this.sliderHitsounds = new Array(0); // Slider hit sounds
-	this.endX = 0; // End X coordinate
-	this.endY = 0; // End Y coordinate
-	this.sliderTime = 0;
-	
-	this.parseSliderObject(line);
+WOsu.CircleObject = function(map, line) {
+    WOsu.HitObject.call(this, map, line);
 }
 
-WOsu.SliderObject.prototype = Object.create( WOsu.HitObject.prototype );
+WOsu.CircleObject.prototype = Object.create(WOsu.HitObject.prototype);
+WOsu.SliderObject = function (map, line) {
+    WOsu.HitObject.call(this, map, line);
 
-WOsu.SliderObject.prototype.parseSliderObject = function(line) {
-	this.parse(line);
-	
-	var points = this.parseParts[5].split("|");
-	var lastX = this.x,lastY = this.y;
-	var nextX,nextY;
-	for (var i=1; i<points.length; i++) {
-		nextX = parseInt(points[i].substring(0,points[i].indexOf(":")));
-		nextY = parseInt(points[i].substring(points[i].indexOf(":")+1));
-		
-		this.controlX.push(nextX);
-		this.controlY.push(nextY);
-		
-		this.sliderLength += Math.sqrt(Math.pow(nextX-lastX,2) + Math.pow(nextY-lastY,2));
-		
-		lastX = nextX;
-		lastY = nextY;
-	}
-	this.controlX.unshift(this.x);
-	this.controlY.unshift(this.y);
-	
-	this.repeats = parseInt(this.parseParts[6]);
-	this.sliderSpeed = parseFloat(this.parseParts[7]);
-	if (this.parseParts.length>8) {
-		points = this.parseParts[8].split("\\|");
-		for (var i=0; i<points.length; i++) {
-			this.sliderHitsounds.push(parseInt(points[i]));
-		}
-	}
-	
-	this.endX = this.controlX[this.controlX.length-1];
-	this.endY = this.controlY[this.controlY.length-1];
-	
-	var currentTiming = 0;
-	var tp = this.map.BeatmapEvents.TimingPoints;
-	var multiplier = this.map.BeatmapData.SliderMultiplier;
-	while (currentTiming<tp.length-1 && tp[currentTiming+1].time<=this.time) currentTiming++;
-	this.endTime = this.sliderSpeed/multiplier/100 * tp[currentTiming].bpm * this.repeats + this.time;
-	this.sliderTime = this.endTime - this.time;
+    this.controlX = []; // Control X coordinates of the slider
+    this.controlY = []; // Control Y coordinates of the slider
+    this.repeats = 0; // Repeats
+    this.curveX = []; // Generated curve point X coordinates
+    this.curveY = []; // Generated curve point Y coordinates
+    this.curveLength = 0; // Number of curve points
+    this.sliderSpeed = 0; // Slider speed (osupixels)
+    this.sliderLength = 0; // Slider length (pixels)
+    this.sliderHitsounds = []; // Slider hit sounds
+    this.endX = 0; // End X coordinate
+    this.endY = 0; // End Y coordinate
+    this.curveTime = 0; // Time for a single slide
+    this.sliderTime = 0; // Time for the whole slider
+    this.timingPoint = null; // The corresponding timing point
+    this.ticks = []; // Slider ticks
+
+    this.parseSliderObject(line);
 }
 
-WOsu.SliderObject.prototype.generateBezier = function() {
-	var max = ~~(this.sliderLength/5);
-	
-	this.curveX = new Array(max+1);
-	this.curveY = new Array(max+1);
-	
-	var t,degree,pointX,pointY;
-	for (var i=0; i<=max; i++) {
-		t = i/max;
-		pointX = this.controlX.slice(0);
-		pointY = this.controlY.slice(0);
-		degree = this.controlX.length;
-		while (degree>1) {
-			for (var j=0; j<degree-1; j++) {
-				pointX[j] = pointX[j]*(1-t) + pointX[j+1]*t;
-				pointY[j] = pointY[j]*(1-t) + pointY[j+1]*t;
-			}
-			degree--;
-		}
-		this.curveX[i] = pointX[0];
-		this.curveY[i] = pointY[0];
-	}
+WOsu.SliderObject.prototype = Object.create(WOsu.HitObject.prototype);
+
+WOsu.SliderObject.prototype.parseSliderObject = function (line) {
+    var points = this.parseParts[5].split("|");
+    var lastX = this.x,
+        lastY = this.y;
+    var nextX, nextY;
+    for (var i = 1; i < points.length; i++) {
+        nextX = parseInt(points[i].substring(0, points[i].indexOf(":")));
+        nextY = parseInt(points[i].substring(points[i].indexOf(":") + 1));
+
+        this.controlX.push(nextX);
+        this.controlY.push(nextY);
+
+        this.sliderLength += Math.sqrt(Math.pow(nextX - lastX, 2) + Math.pow(nextY - lastY, 2));
+
+        lastX = nextX;
+        lastY = nextY;
+    }
+    this.controlX.unshift(this.x);
+    this.controlY.unshift(this.y);
+
+    this.repeats = parseInt(this.parseParts[6]);
+    this.sliderSpeed = parseFloat(this.parseParts[7]);
+    if (this.parseParts.length > 8) {
+        points = this.parseParts[8].split("\\|");
+        for (var i = 0; i < points.length; i++) {
+            this.sliderHitsounds.push(parseInt(points[i]));
+        }
+    }
+
+    this.endX = this.controlX[this.controlX.length - 1];
+    this.endY = this.controlY[this.controlY.length - 1];
+
+    // Slider timings
+    var multiplier = this.map.BeatmapData.SliderMultiplier;
+    this.timingPoint = this.map.getTimingPoint(this.time);
+    this.curveTime = this.sliderSpeed / multiplier / 100 * this.timingPoint.bpm;
+    this.endTime = this.curveTime * this.repeats + this.time;
+    this.sliderTime = this.endTime - this.time;
+
+    // Slider tick points
+    var tickRate = this.map.BeatmapData.SliderTickRate;
+    var frequency = (100.0 * this.timingPoint.ratio * multiplier) / (this.sliderSpeed * tickRate);
+    for (var i = frequency; i < 1.0 - WOsu.EPSILON; i += frequency) {
+        this.ticks.push(i);
+    }
 }
 
-WOsu.SliderObject.prototype.getPosition = function(time) {
-	var partial = 0;
-	if (this.sliderTime>0) partial = (time - this.time)/this.sliderTime;
-	partial = (partial * this.repeats) % 2;
-	
-	if (partial>1) {
-		partial = 2 - partial;
-	}
-	
-	var index;
-	var t = partial * this.curveX.length - (index = ~~(partial * this.curveX.length));
-	var next = index + 1;
-	if (index<0) index = 0; else if (index>=this.curveX.length) index = this.curveX.length-1;
-	if (next<0) next = 0; else if (next>=this.curveX.length) next = this.curveX.length-1;
-	
-	return [ this.curveX[index]*(1-t) + this.curveX[next]*t , this.curveY[index]*(1-t) + this.curveY[next]*t ];
-}
-WOsu.SpinnerObject = function(map,line) {
-	WOsu.HitObject.call(this,map,line);
-	
-	this.spinnerTime = 0; // Spinner time
-	
-	this.parseSpinnerObject(line);
+WOsu.SliderObject.prototype.generateBezier = function () {
+    var max = ~~(this.sliderLength / 5);
+
+    this.curveX = new Array(max + 1);
+    this.curveY = new Array(max + 1);
+
+    var t, degree, pointX, pointY;
+    for (var i = 0; i <= max; i++) {
+        t = i / max;
+        pointX = this.controlX.slice(0);
+        pointY = this.controlY.slice(0);
+        degree = this.controlX.length;
+        while (degree > 1) {
+            for (var j = 0; j < degree - 1; j++) {
+                pointX[j] = pointX[j] * (1 - t) + pointX[j + 1] * t;
+                pointY[j] = pointY[j] * (1 - t) + pointY[j + 1] * t;
+            }
+            degree--;
+        }
+        this.curveX[i] = pointX[0];
+        this.curveY[i] = pointY[0];
+    }
+
+    this.curveLength = this.curveX.length;
 }
 
-WOsu.SpinnerObject.prototype = Object.create( WOsu.HitObject.prototype );
+WOsu.SliderObject.prototype.getPosition = function (time) {
+    var last = 0;
+    var next = 0;
+    var t = 0;
+    if (time < this.time) {
+        last = 0;
+        next = last;
+        t = 0;
+    }
+    else if (time > this.endTime) {
+        last = this.curveLength - 1;
+        next = last;
+        t = 0;
+    }
+    else {
+        var diff = time - this.time;
+        var repeats = ~~(diff / this.curveTime);
+        var partial = diff % this.curveTime;
+        if (repeats % 2 == 1) {
+            partial = 1.0 - partial;
+        }
+        last = ~~(partial * this.curveLength);
+        next = last + 1;
+        if (next >= this.curveLength) {
+            next = last;
+        }
+        t = partial * this.curveLength - last;
+    }
+
+    return [ this.curveX[last] * (1 - t) + this.curveX[next] * t, this.curveY[last] * (1 - t) + this.curveY[next] * t ];
+}
+
+WOsu.SliderObject.prototype.getDistance = function (time, x, y) {
+    var pos = this.getPosition(time);
+    var dx = pos[0] - x;
+    var dy = pos[1] - y;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+WOsu.SpinnerObject = function(map, line) {
+    WOsu.HitObject.call(this, map, line);
+
+    this.spinnerTime = 0; // Spinner time
+
+    this.parseSpinnerObject(line);
+}
+
+WOsu.SpinnerObject.prototype = Object.create(WOsu.HitObject.prototype);
 
 WOsu.SpinnerObject.prototype.parseSpinnerObject = function(line) {
-	this.parse(line);
-	
-	this.endTime = parseInt(this.parseParts[5]);
-	this.spinnerTime = this.endTime - this.time;
+    this.endTime = parseInt(this.parseParts[5]);
+    this.spinnerTime = this.endTime - this.time;
 }
 /*
  * WOsu.Player
  *
  *
  */
-WOsu.Player = function(options) {
+WOsu.Player = function (options) {
     this.width = options.width || 640;
     this.height = options.height || 480;
 
@@ -1589,7 +1407,7 @@ WOsu.Player = function(options) {
 
 WOsu.Player.prototype.constructor = WOsu.Player;
 
-WOsu.Player.prototype.initThree = function() {
+WOsu.Player.prototype.initThree = function () {
     var instance = this;
 
     // New renderer, no sorting
@@ -1601,7 +1419,7 @@ WOsu.Player.prototype.initThree = function() {
     // Three.js Scene
     var scene = new THREE.Scene();
 
-    // Rendering target for effects
+    // TODO Rendering target for layers
     var target = new THREE.WebGLRenderTarget(this.width, this.height, {
         minFilter: THREE.LinearFilter,
         magFilter: THREE.NearestFilter,
@@ -1609,14 +1427,15 @@ WOsu.Player.prototype.initThree = function() {
     });
 
     // Allow cross origin loading (?)
-    THREE.ImageUtils.crossOrigin = '';
+    THREE.ImageUtils.crossOrigin = "";
 
     // Need to scale to at least 640 x 480 units
     var ratio = this.height / this.width;
     var camera;
     if (ratio > 0.75) { // Width limit
         camera = new THREE.OrthographicCamera(-320, 320, 320 * ratio, -320 * ratio, 1, 1e5);
-    } else { // Height limit
+    }
+    else { // Height limit
         camera = new THREE.OrthographicCamera(-240 / ratio, 240 / ratio, 240, -240, 1, 1e5);
     }
     camera.position.set(0, 0, 2);
@@ -1634,15 +1453,13 @@ WOsu.Player.prototype.initThree = function() {
     this.elements.three = renderer.domElement;
 }
 
-WOsu.Player.prototype.load = function(options) {
+WOsu.Player.prototype.load = function (options) {
     var instance = this;
 
     this.loaded = false;
     this.playing = false;
 
     this.api = WOsu.API;
-
-    console.log(options);
 
     if (options.api && options.api.trim() != "") {
         this.api = options.api.trim();
@@ -1665,17 +1482,21 @@ WOsu.Player.prototype.load = function(options) {
     }, { // Load replay
         fn: instance.loadReplay,
         args: [options.replay.type, options.replay.data]
-    }], function() {
+    }], function () {
         instance.callback.progress("Replay", "Finished");
 
-        instance.loadBeatmap(function() {
+        // Load beatmap
+        instance.loadBeatmap(function () {
+            // Load gameplay variables
+            instance.loadGameplay();
+
             WOsu.resync(instance, [{
                 fn: instance.loadAudio,
                 args: []
             }, {
                 fn: instance.loadThree,
                 args: []
-            }], function() {
+            }], function () {
                 instance.callback.completion();
             });
         });
@@ -1685,23 +1506,23 @@ WOsu.Player.prototype.load = function(options) {
     // this.initStoryboard();
 }
 
-WOsu.Player.prototype.setProgressCallback = function(callback) {
+WOsu.Player.prototype.setProgressCallback = function (callback) {
     this.callback.progress = callback;
 }
 
-WOsu.Player.prototype.setCompletionCallback = function(callback) {
+WOsu.Player.prototype.setCompletionCallback = function (callback) {
     this.callback.completion = callback;
 }
 
-WOsu.Player.prototype.setErrorCallback = function(callback) {
+WOsu.Player.prototype.setErrorCallback = function (callback) {
     this.callback.error = callback;
 }
 
-WOsu.Player.prototype.loadSkin = function(resyncFinish, loc) {
+WOsu.Player.prototype.loadSkin = function (resyncFinish, loc) {
     var instance = this;
 
     // Progress callback for the skin loader
-    var progress = function(loaded, total) {
+    var progress = function (loaded, total) {
         instance.callback.progress("Skin", loaded + " / " + total + " loaded");
         if (loaded == total) {
             instance.callback.progress("Skin", "Finished");
@@ -1712,7 +1533,7 @@ WOsu.Player.prototype.loadSkin = function(resyncFinish, loc) {
     instance.skin = WOsu.SkinLoader.load(loc, progress);
 }
 
-WOsu.Player.prototype.loadReplay = function(resyncFinish, type, data) {
+WOsu.Player.prototype.loadReplay = function (resyncFinish, type, data) {
     var instance = this;
     this.callback.progress("Replay", "Loading replay");
 
@@ -1739,32 +1560,35 @@ WOsu.Player.prototype.loadReplay = function(resyncFinish, type, data) {
             contentType: false,
             processData: false,
             type: "POST",
-        }).done(function(data) {
+        }).done(function (data) {
             try {
                 var error = JSON.parse(data);
                 localError(error.message);
-            } catch (e) {
+            }
+            catch (e) {
                 instance.parseRawReplay(data, localFinish);
             }
-        }).fail(function(data) {
+        }).fail(function (data) {
             localError("Failed to upload replay");
         });
-    } else {
+    }
+    else {
         $.ajax({
             url: instance.api + "/get/" + B64.encode(encodeURI(data)),
             contentType: false,
             processData: false,
             type: "GET",
-        }).done(function(data) {
+        }).done(function (data) {
             if (!instance.parseJSONReplay(data, localFinish)) {
                 try {
                     var error = JSON.parse(data);
                     localError(error.message);
-                } catch (e) {
+                }
+                catch (e) {
                     instance.parseRawReplay(data, localFinish);
                 }
             }
-        }).fail(function(data) {
+        }).fail(function (data) {
             localError("Failed to retrieve replay");
         });
     }
@@ -1773,7 +1597,7 @@ WOsu.Player.prototype.loadReplay = function(resyncFinish, type, data) {
 /**
     Parse a replay in binary osr format
  */
-WOsu.Player.prototype.parseRawReplay = function(bytedata, finish) {
+WOsu.Player.prototype.parseRawReplay = function (bytedata, finish) {
     var instance = this;
     this.callback.progress("Replay", "Loading raw replay");
 
@@ -1787,7 +1611,7 @@ WOsu.Player.prototype.parseRawReplay = function(bytedata, finish) {
 /**
     Parse an pre-parsed replay in json format
  */
-WOsu.Player.prototype.parseJSONReplay = function(data, finish) {
+WOsu.Player.prototype.parseJSONReplay = function (data, finish) {
     var instance = this;
     this.callback.progress("Replay", "Loading JSON replay");
 
@@ -1796,7 +1620,8 @@ WOsu.Player.prototype.parseJSONReplay = function(data, finish) {
         finish();
 
         return true;
-    } catch (e) {
+    }
+    catch (e) {
         return false;
     }
 }
@@ -1804,28 +1629,41 @@ WOsu.Player.prototype.parseJSONReplay = function(data, finish) {
 /**
     Parse replay information to proceed loading other resources
  */
-WOsu.Player.prototype.parseReplayInfo = function() {
+WOsu.Player.prototype.parseReplayInfo = function () {
     var instance = this;
 }
 
-WOsu.Player.prototype.loadBeatmap = function(finish) {
+/**
+    Load the beatmap from the API
+    
+    TODO Seperate from replay, load any beatmap by hash or name or whatever
+*/
+WOsu.Player.prototype.loadBeatmap = function (finish) {
     var instance = this;
 
     this.callback.progress("Beatmap", "Loading");
 
     function localFinish() {
+        // TODO Transformations because of Easy/HR?
+        // Hidden and Flashlight should go into the shaders
+        // Technical calculations
+        instance.beatmap.loadMechanics();
+        // TODO Include mods
+        //instance.beatmap.loadMechanics(this.replay.mods);
+        // Create and sort game events
+        instance.beatmap.loadEvents();
+
         instance.callback.progress("Beatmap", "Finished");
         finish();
     }
 
     // Make sure the replay is loaded and it contains a beatmap hash
-    console.log(this.replay);
     if (this.replay && this.replay.type == 0 && this.replay.bhash.length == 32) {
         // Get beatmap metadata
         $.ajax({
             url: instance.api + "/" + this.replay.bhash,
             type: "GET",
-        }).done(function(data) {
+        }).done(function (data) {
             instance.metadata = data;
 
             // Get beatmap data
@@ -1834,31 +1672,52 @@ WOsu.Player.prototype.loadBeatmap = function(finish) {
                 contentType: false,
                 processData: false,
                 type: "GET",
-            }).done(function(data) {
+            }).done(function (data) {
                 // Load the beatmap
                 instance.beatmap = WOsu.BeatmapLoader.load(data);
 
                 localFinish();
-            }).fail(function(data) {
+            }).fail(function (data) {
                 // In case the data comes as a typical xhr request (?)
-                if (typeof(data) == "object" && data.readyState == 4 && data.status == 200) {
+                if (typeof (data) == "object" && data.readyState == 4 && data.status == 200) {
                     instance.beatmap = WOsu.BeatmapLoader.load(data.responseText);
 
                     localFinish();
-                } else {
+                }
+                else {
                     instance.beatmap = new WOsu.Beatmap();
                     instance.callback.progress("Beatmap", "Failed");
                 }
             });
-        }).fail(function(data) {
+        }).fail(function (data) {
             instance.callback.error("Beatmap", "Error retreiving metadata");
         });
-    } else {
+    }
+    else {
         instance.callback.error("Beatmap", "Invalid replay");
     }
 }
 
-WOsu.Player.prototype.loadAudio = function(loadResync) {
+/**
+    Load gameplay variables
+*/
+WOsu.Player.prototype.loadGameplay = function () {
+    this.game = {
+        score: new WOsu.ScoreManager(this.beatmap.BeatmapMechanics),
+        index: {
+            eventIndex: 0,
+            eventLength: this.beatmap.BeatmapMechanics.events.length,
+            replayIndex: 0,
+            replayEdge: 0,
+            replayLength: this.replay.replayData.length
+        },
+        currentCircles: [],
+        currentSliders: [],
+        currentSpinners: []
+    };
+}
+
+WOsu.Player.prototype.loadAudio = function (loadResync) {
     this.callback.progress("Audio", "Loading");
 
     var audioElement = document.createElement("audio");
@@ -1877,13 +1736,12 @@ WOsu.Player.prototype.loadAudio = function(loadResync) {
 //        gamemode specific files, e.g. StandardPlayer, TaikoPlayer, etc.
 // FUTURE For ctb player, figure out how random positions are seeded
 
-WOsu.Player.prototype.loadThree = function(loadResync) {
+WOsu.Player.prototype.loadThree = function (loadResync) {
     var instance = this;
 
     this.callback.progress("Three", "Loading objects");
 
     this.three.layers = {};
-    this.game = {};
 
     this.three.materials = {};
 
@@ -1897,7 +1755,7 @@ WOsu.Player.prototype.loadThree = function(loadResync) {
         fn: instance.loadThreeUI
     }, {
         fn: instance.loadThreeStatistics
-    }], function() {
+    }], function () {
         // Finish up
         instance.loadThreeScene();
 
@@ -1912,7 +1770,7 @@ WOsu.Player.prototype.loadThree = function(loadResync) {
     
     // TODO loadThreeStoryboard
 */
-WOsu.Player.prototype.loadThreeStoryboard = function(threeResync) {
+WOsu.Player.prototype.loadThreeStoryboard = function (threeResync) {
     var storyboard = new THREE.Object3D();
     var bgpath = "";
     var bme = this.beatmap.BeatmapEvents.BackgroundEvents;
@@ -1938,23 +1796,72 @@ WOsu.Player.prototype.loadThreeStoryboard = function(threeResync) {
         storyboard.add(background);
     }
 
-    this.three.layers.storyboard = storyboard;
+    this.three.layers.storyboard = {
+        object: storyboard,
+        properties: {}
+    };
 
     threeResync();
 }
 
 /**
     Load Three.js elements for displaying the gameplay.
-    
-    // TODO Make this super more efficient by consolidating all objects into a flat array.
 */
-WOsu.Player.prototype.loadThreeGameplay = function(threeResync) {
+WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
     // Hit objects
     var gameplay = new THREE.Object3D();
     var bme = this.beatmap.BeatmapEvents.BackgroundEvents;
     var bmo = this.beatmap.BeatmapObjects;
     var bmm = this.beatmap.BeatmapMechanics;
     var textures = this.skin.textures;
+
+    var approachUniforms = {
+        currentTime: {
+            type: 'f',
+            value: Number.NEGATIVE_INFINITY
+        },
+        approachRate: {
+            type: 'f',
+            value: bmm.AR
+        },
+        overallDifficulty: {
+            type: 'f',
+            value: bmm.OD
+        },
+        circleSize: {
+            type: 'f',
+            value: bmm.CS
+        },
+
+        approachcircle: {
+            type: 't',
+            value: textures.approachcircle
+        }
+    };
+    var approachAttributes = {
+        colorMask: {
+            type: 'v4'
+        },
+        startTime: {
+            type: 'f'
+        },
+        hitTime: {
+            type: 'f'
+        },
+        center: {
+            type: 'v2'
+        }
+    };
+    var approachMaterial = new THREE.ShaderMaterial({
+        uniforms: approachUniforms,
+        attributes: approachAttributes,
+
+        vertexShader: WOsu.Player.approachShader.vertexShader,
+        fragmentShader: WOsu.Player.approachShader.fragmentShader,
+
+        side: THREE.DoubleSide,
+        transparent: true
+    });
 
     var hitUniforms = {
         currentTime: {
@@ -2046,7 +1953,7 @@ WOsu.Player.prototype.loadThreeGameplay = function(threeResync) {
             type: 'f',
             value: bmm.CS
         },
-        
+
         spinner_approachcircle: {
             type: 't',
             value: textures.spinner_approachcircle
@@ -2067,26 +1974,33 @@ WOsu.Player.prototype.loadThreeGameplay = function(threeResync) {
         endTime: {
             type: 'f'
         },
-        spin: {
+        spinAmount: {
             type: 'f'
         }
     };
     var spinnerMaterial = new THREE.ShaderMaterial({
         uniforms: spinnerUniforms,
         attributes: spinnerAttributes,
-        
+
         vertexShader: WOsu.Player.spinnerShader.vertexShader,
         fragmentShader: WOsu.Player.spinnerShader.fragmentShader,
-        
+
         side: THREE.DoubleSide,
         transparent: true
     });
-    
+
     var comboColor = 0;
     var comboNumber = 1;
     var totalObjects = bmo.length;
+
+    // Approach circles
+    var approachAdd = [];
+    // Hit circles and sliders
     var hitAdd = [];
+    // Spinners
     var spinnerAdd = [];
+    // TODO Follow points
+
     var meshes = [];
     for (var i = 0; i < totalObjects; i++) {
         var hitobj = bmo[i];
@@ -2104,98 +2018,131 @@ WOsu.Player.prototype.loadThreeGameplay = function(threeResync) {
         // TODO Stacked notes offset (probably goes in BeatmapLoader)
         // Link meshes with corresponding hit objects
         var nextobj;
-        if (hitobj.isBeat()) {
-            
+        if (hitobj.isCircle()) {
+
+            nextobj = this.createThreeApproachCircle({
+                material: approachMaterial,
+                object: hitobj,
+                z: -i / totalObjects - 1,
+                mechanics: bmm
+            });
+            nextobj.gameObject = hitobj;
+            approachAdd.push(nextobj);
+            meshes.push(nextobj);
+
             nextobj = this.createThreeCircle({
                 material: hitMaterial,
                 object: hitobj,
-                z: -i / totalObjects - 1,
+                z: -i / totalObjects - 2,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
             hitAdd.push(nextobj);
             meshes.push(nextobj);
-            
-        } else if (hitobj.isSlider()) {
-            
+
+        }
+        else if (hitobj.isSlider()) {
+
+            nextobj = this.createThreeApproachCircle({
+                material: approachMaterial,
+                object: hitobj,
+                z: -i / totalObjects - 1,
+                mechanics: bmm
+            });
+            nextobj.gameObject = hitobj;
+            approachAdd.push(nextobj);
+            meshes.push(nextobj);
+
             nextobj = this.createThreeSliderStart({
                 material: hitMaterial,
                 object: hitobj,
-                z: -i / totalObjects - 1,
+                z: -i / totalObjects - 2,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
             hitAdd.push(nextobj);
             meshes.push(nextobj);
-            
+
             nextobj = this.createThreeSliderEnd({
                 material: hitMaterial,
                 object: hitobj,
-                z: -(i + 0.3) / totalObjects - 1,
+                z: -(i + 0.3) / totalObjects - 2,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
             hitAdd.push(nextobj);
             meshes.push(nextobj);
-            
+
             nextobj = this.createThreeSliderBody({
                 material: hitMaterial,
                 object: hitobj,
-                z: -(i + 0.6) / totalObjects - 1,
+                z: -(i + 0.6) / totalObjects - 2,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
             hitAdd.push(nextobj);
             meshes.push(nextobj);
-            
-        } else if (hitobj.isSpinner()) {
-            
+
+        }
+        else if (hitobj.isSpinner()) {
+
             nextobj = this.createThreeSpinner({
                 material: spinnerMaterial,
                 attributes: spinnerAttributes,
                 object: hitobj,
-                z: -i / totalObjects + 2, // Spinners go behind other objects
+                z: -i / totalObjects - 3, // Spinners go behind other objects
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
             spinnerAdd.push(nextobj);
             meshes.push(nextobj);
-            
+
         }
     }
-    
+
     // Spinners go behind objects
-    for (var i=spinnerAdd.length-1; i>=0; i--) {
+    for (var i = spinnerAdd.length - 1; i >= 0; i--) {
         gameplay.add(spinnerAdd[i]);
     }
-    for (var i=hitAdd.length-1; i>=0; i--) {
+    for (var i = hitAdd.length - 1; i >= 0; i--) {
         gameplay.add(hitAdd[i]);
     }
-    
+    // Approach circles go in front of everything
+    for (var i = approachAdd.length - 1; i >= 0; i--) {
+        gameplay.add(approachAdd[i]);
+    }
+
     // Set all objects to be invisible, except ones within the approach rate at the start
     var index = 0;
     var threshold = bmm.AR * 2
-    for (var i=0; i<hitAdd.length; i++) {
-        if (hitAdd[i].gameObject.time < threshold) {
-            hitAdd[i].visible = true;
-            if (i==index) {
+    for (var i = 0; i < meshes.length; i++) {
+        if (meshes[i].gameObject.time < threshold) {
+            meshes[i].visible = true;
+            if (i == index) {
                 index++;
             }
         }
         else {
-            hitAdd[i].visible = false;
+            meshes[i].visible = false;
         }
     }
 
-    this.three.layers.gameplay = gameplay;
-    // The current extend of visibility
-    this.game.visibility = { start: 0, end: index };
-    // An ordered list of all meshes
-    this.game.objectMeshes = meshes;
-    this.game.objectCount = meshes.length;
-    // Shaders used in this layer
-    this.game.hitMaterial = hitMaterial;
-    this.game.spinnerMaterial = spinnerMaterial;
+    // Layer object
+    this.three.layers.gameplay = {
+        object: gameplay,
+        properties: {
+            // The conservative extent of visibility
+            objectStart: 0,
+            objectEnd: index,
+            // An ordered list of all meshes
+            objects: meshes,
+            objectLength: meshes.length,
+            // Materials
+            approachMaterial: approachMaterial,
+            hitMaterial: hitMaterial,
+            spinnerMaterial: spinnerMaterial
+        }
+    };
 
     threeResync();
 }
@@ -2205,7 +2152,7 @@ WOsu.Player.prototype.loadThreeGameplay = function(threeResync) {
     
     // TODO Same as loadThreeGameplay
 */
-WOsu.Player.prototype.loadThreeReplay = function(threeResync) {
+WOsu.Player.prototype.loadThreeReplay = function (threeResync) {
     var replay = new THREE.Object3D();
     var textures = this.skin.textures;
 
@@ -2216,17 +2163,18 @@ WOsu.Player.prototype.loadThreeReplay = function(threeResync) {
             y: 0,
             z: 0
         });
-    } else {
+    }
+    else {
         cursorMesh = new THREE.Object3D();
     }
 
     replay.add(cursorMesh);
 
-    this.three.layers.replay = replay;
-    this.game.cursorMesh = cursorMesh;
-    this.game.replay = {
-        index: 0,
-        lastRelease: Number.NEGATIVE_INFINITY
+    this.three.layers.replay = {
+        object: replay,
+        properties: {
+            cursorMesh: cursorMesh
+        }
     };
 
     threeResync();
@@ -2237,10 +2185,13 @@ WOsu.Player.prototype.loadThreeReplay = function(threeResync) {
     
     // TODO loadThreeUI
 */
-WOsu.Player.prototype.loadThreeUI = function(threeResync) {
+WOsu.Player.prototype.loadThreeUI = function (threeResync) {
     var ui = new THREE.Object3D();
 
-    this.three.layers.ui = ui;
+    this.three.layers.ui = {
+        object: ui,
+        properties: {}
+    };
 
     threeResync();
 }
@@ -2250,10 +2201,13 @@ WOsu.Player.prototype.loadThreeUI = function(threeResync) {
     
     // TODO loadThreeStatistics
 */
-WOsu.Player.prototype.loadThreeStatistics = function(threeResync) {
+WOsu.Player.prototype.loadThreeStatistics = function (threeResync) {
     var stat = new THREE.Object3D();
 
-    this.three.layers.stat = stat;
+    this.three.layers.stat = {
+        object: stat,
+        properties: {}
+    };
 
     threeResync();
 }
@@ -2261,17 +2215,16 @@ WOsu.Player.prototype.loadThreeStatistics = function(threeResync) {
 /**
     Assemble Three.js scene together. This is the last loading function called.
 */
-WOsu.Player.prototype.loadThreeScene = function() {
+WOsu.Player.prototype.loadThreeScene = function () {
     // Build scene
-    var scene = new THREE.Scene();
+    var scene = this.three.scene;
     scene.add(this.three.camera);
 
     // Add layers to the scene
-    scene.add(this.three.layers.storyboard);
-    scene.add(this.three.layers.gameplay);
-    scene.add(this.three.layers.replay);
-
-    this.three.scene = scene;
+    var layers = this.three.layers;
+    scene.add(layers.storyboard.object);
+    scene.add(layers.gameplay.object);
+    scene.add(layers.replay.object);
 }
 
 
@@ -2362,7 +2315,7 @@ WOsu.Player.hitShader = {
         "#define TYPE_END_CIRCLE 1.0",
         "#define TYPE_SLIDER_BODY 2.0",
         "#define TYPE_SLIDER_REPEAT 3.0",
-        
+
         // The current time of the playback
         "uniform float currentTime;",
 
@@ -2376,7 +2329,7 @@ WOsu.Player.hitShader = {
 
         // The hit object start time
         "attribute float startTime;",
-        
+
         // The hit object end time
         "attribute float endTime;",
 
@@ -2389,10 +2342,10 @@ WOsu.Player.hitShader = {
 
         // When it's kiai time, flash like crazy
         // TODO "uniform float kiaiTime;"
-        
+
         // Center of the hit object
         "attribute vec2 center;",
-        
+
         // Hit object type
         // 0 = Numbered hit circle
         // 1 = End circle
@@ -2437,7 +2390,7 @@ WOsu.Player.hitShader = {
         "#define TYPE_END_CIRCLE 1.0",
         "#define TYPE_SLIDER_BODY 2.0",
         "#define TYPE_SLIDER_REPEAT 3.0",
-        
+
         "uniform sampler2D hitcircle;",
         "uniform sampler2D hitcircle_overlay;",
         "uniform sampler2D digits[10];",
@@ -2479,13 +2432,13 @@ WOsu.Player.hitShader = {
         "       color = tex1 * tex1.a;",
         "   }",
         // TODO Draw the slider ball
-        "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, vAlpha);",
+        "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, clamp(vAlpha + 0.5, 0.0, 1.0));",
         "}"
     ].join("\n")
 };
 
 /**
-    Shader for spinner
+    Shader for spinners
 */
 WOsu.Player.spinnerShader = {
     vertexShader: [
@@ -2495,12 +2448,16 @@ WOsu.Player.spinnerShader = {
         // Beatmap mechanics to compute opacity
         "uniform float approachRate;",
         "uniform float overallDifficulty;",
+        "uniform float circleSize;",
 
         // The spinner start time
         "attribute float startTime;",
 
         // The spinner end time
         "attribute float endTime;",
+
+        // The spin amount
+        "attribute float spinAmount;",
 
         // When it's kiai time, flash like crazy
         // TODO "uniform float kiaiTime;"
@@ -2510,50 +2467,135 @@ WOsu.Player.spinnerShader = {
         "varying vec2 vUv;",
         "varying vec4 vColor;",
         "varying float vAlpha;",
+        "varying float vScale;",
 
         "void main() {",
         // If the spinner is before the approach rate
         // Or after the end time
-        "   if (currentTime - startTime < -approachRate || currentTime > endTime) {",
+        "   if (currentTime < startTime - approachRate || currentTime > endTime) {",
         // Draw a degenerate triangle behind the camera
         "       gl_Position = vec4(0, 0, -2, 1);",
         "   }",
         "   else {",
-        // Interpolate alpha from approach rate to 50
-        "       float alpha = clamp((approachRate + currentTime - objectTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
-        "       vColor = colorMask;",
+        "       float alpha = clamp((approachRate + currentTime - startTime) / (approachRate), 0.0, 1.0);",
+        // Interpolate scale from start time to end time
+        "       vScale = clamp((endTime - currentTime) / (endTime - startTime), 0.0, 1.0);",
+        // Interpolate alpha from approach rate to start time
         "       vAlpha = alpha;",
+        "       vColor = vec4(1.0, 1.0, 1.0, 1.0);",
         "       vUv = uv;",
         "       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
         "   }",
         "}"
     ].join("\n"),
 
-    // FUTURE Handle sliders as osu does, built-in without textures (?)
     fragmentShader: [
-        "uniform sampler2D hitcircle;",
-        "uniform sampler2D hitcircle_overlay;",
-        "uniform sampler2D digits[10];",
+        "uniform sampler2D spinner_approachcircle;",
+        "uniform sampler2D spinner_circle;",
+        "uniform sampler2D spinner_background;",
 
         "varying vec2 vUv;",
         "varying vec4 vColor;",
-        "varying vec4 vAlpha;",
+        "varying float vAlpha;",
+        "varying float vScale;",
 
         "void main() {",
-        // TODO Draw digits
         "   vec4 color = vec4(0, 0, 0, 0);",
-        "   vec4 tex1 = texture2D(hitcircle, vUv);",
-        "   color = tex1 * vColor * tex1.a;",
+        "   vec4 tex = texture2D(spinner_background, vUv);",
+        "   color = tex * vColor * tex.a;",
 
-        "   vec4 tex2 = texture2D(hitcircle_overlay, vUv);",
-        "   color = color * (1.0 - tex2.a) + tex2 * tex2.a;",
+        // Spinner circle is square-ish
+        // 512 x 384 -> 384 x 384
+        "   vec2 nuv = vec2(vUv.x * 4.0 / 3.0 - 1.0 / 6.0, vUv.y);",
+        "   tex = texture2D(spinner_circle, nuv);",
+        "   color = mix(color, tex, tex.a);",
+
+        // Approach circle is also square-ish
+        "   nuv = 2.0 * (nuv - 0.5) / vScale;",
+        "   if (nuv.x >= -1.0 && nuv.x <=1.0 && nuv.x >= -1.0 && nuv.x <= 1.0) {",
+        "       nuv = (nuv + 1.0) / 2.0;",
+        "       tex = texture2D(spinner_approachcircle, nuv);",
+        "       color = mix(color, tex, tex.a);",
+        "   }",
+
+        "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, vAlpha);",
+        "}"
+    ].join("\n")
+};
+
+/**
+    Shader for approach circles
+*/
+WOsu.Player.approachShader = {
+    vertexShader: [
+        // The current time of the playback
+        "uniform float currentTime;",
+
+        // Beatmap mechanics to compute opacity and size
+        "uniform float approachRate;",
+        "uniform float overallDifficulty;",
+        "uniform float circleSize;",
+
+        // The hit object start time
+        "attribute float startTime;",
+
+        // The hit object hit time
+        "attribute float hitTime;",
+
+        // The hit object color
+        "attribute vec4 colorMask;",
+
+        // The position of the hit object
+        "attribute vec2 center;",
+
+        // When it's kiai time, flash like crazy
+        // TODO "uniform float kiaiTime;"
+
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        // If the approach circle is before the approach rate
+        // Or after the object time or hit time
+        "   if (currentTime - startTime < -approachRate || currentTime > startTime || currentTime > hitTime) {",
+        // Draw a degenerate triangle behind the camera
+        "       gl_Position = vec4(0, 0, -2, 1);",
+        "   }",
+        "   else {",
+        // Interpolate alpha from approach rate to 50
+        "       float alpha = clamp((approachRate + currentTime - startTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
+        // Compute size
+        "       vec3 scaledPosition = position;",
+        "       float scale = 1.0 + 2.0 * (startTime - currentTime) / approachRate;",
+        "       scaledPosition.x = scaledPosition.x * scale + center.x;",
+        "       scaledPosition.y = scaledPosition.y * scale + center.y;",
+        "       vColor = colorMask;",
+        "       vAlpha = alpha;",
+        "       vUv = uv;",
+        "       gl_Position = projectionMatrix * modelViewMatrix * vec4(scaledPosition, 1.0);",
+        "   }",
+        "}"
+    ].join("\n"),
+
+    // FUTURE Handle sliders as osu does, built-in without textures (?)
+    fragmentShader: [
+        "uniform sampler2D approachcircle;",
+
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        "   vec4 tex1 = texture2D(approachcircle, vUv);",
+        "   vec4 color = tex1 * vColor * tex1.a;",
 
         "   gl_FragColor = color * vAlpha;",
         "}"
     ].join("\n")
 };
 
-WOsu.Player.prototype.createThreeQuad = function(params) {
+WOsu.Player.prototype.createThreeQuad = function (params) {
     if (params.size !== undefined) {
         params.width = params.height = params.size;
     }
@@ -2595,7 +2637,7 @@ WOsu.Player.prototype.createThreeQuad = function(params) {
     return mesh;
 }
 
-WOsu.Player.prototype.createThreeCursor = function(params) {
+WOsu.Player.prototype.createThreeCursor = function (params) {
     if (params.size !== undefined) {
         params.width = params.height = params.size;
     }
@@ -2603,25 +2645,23 @@ WOsu.Player.prototype.createThreeCursor = function(params) {
     params.color = (params.color !== undefined) ? params.color : new THREE.Vector4(1, 1, 1, 1);
 
     var geometry = new THREE.BufferGeometry();
-    
+
     var s = 32 / 2.0;
-    var positions = new Float32Array([
+    var positions = new Float32Array([-s, -s, 0, -s, s, 0,
+        s, s, 0,
+
         -s, -s, 0,
-        -s,  s, 0,
-         s,  s, 0,
-        
-        -s, -s, 0,
-         s,  s, 0,
-         s, -s, 0
+        s, s, 0,
+        s, -s, 0
     ]);
     geometry.addAttribute("position", new THREE.BufferAttribute(positions, 3));
-    
+
     var uvs = new Float32Array([
         0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
         0.0, 0.0, 1.0, 1.0, 1.0, 0.0
     ]);
     geometry.addAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-    
+
     var texture = this.skin.textures.cursor;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
@@ -2657,64 +2697,122 @@ WOsu.Player.prototype.createThreeCursor = function(params) {
     return mesh;
 }
 
-WOsu.Player.prototype.createThreeCircle = function(params) {
+WOsu.Player.prototype.createThreeApproachCircle = function (params) {
     var obj = params.object;
     var x = obj.x - 256;
     var y = 192 - obj.y;
     var z = params.z;
-    var s = params.mechanics.CS / 2;
+    var s = params.mechanics.CS;
     var colors = params.mechanics.colors;
     var r = colors[obj.combo][0] / 255.0;
     var g = colors[obj.combo][1] / 255.0;
     var b = colors[obj.combo][2] / 255.0;
 
     var geometry = new THREE.BufferGeometry();
-    
-    var positions = [
-        x - s, y - s, z,
-        x - s, y + s, z,
-        x + s, y + s, z,
-        
-        x - s, y - s, z,
-        x + s, y + s, z,
-        x + s, y - s, z
+
+    var positions = [-s, -s, z, -s, s, z,
+        s, s, z,
+
+        -s, -s, z,
+        s, s, z,
+        s, -s, z
     ];
-    
+
     var uvs = [
         0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
         0.0, 0.0, 1.0, 1.0, 1.0, 0.0
     ];
-    
+
     var colors = [
         r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0,
         r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0
     ];
-    
+
     var startTimes = [
         obj.time, obj.time, obj.time,
         obj.time, obj.time, obj.time
     ];
-    
-    var endTimes = [
-        obj.time, obj.time, obj.time,
-        obj.time, obj.time, obj.time
-    ];
-    
+
     var hitTimes = [
         Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY,
         Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY
     ];
-    
+
     var centers = [
         x, y, x, y, x, y,
         x, y, x, y, x, y
     ];
-    
+
+    geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.addAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geometry.addAttribute("colorMask", new THREE.BufferAttribute(new Float32Array(colors), 4));
+    geometry.addAttribute("startTime", new THREE.BufferAttribute(new Float32Array(startTimes), 1));
+    geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
+    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
+
+    var mesh = new THREE.Mesh(geometry, params.material);
+
+    return mesh;
+}
+
+WOsu.Player.prototype.createThreeCircle = function (params) {
+    var obj = params.object;
+    var x = obj.x - 256;
+    var y = 192 - obj.y;
+    var z = params.z;
+    var s = params.mechanics.CS;
+    var colors = params.mechanics.colors;
+    var r = colors[obj.combo][0] / 255.0;
+    var g = colors[obj.combo][1] / 255.0;
+    var b = colors[obj.combo][2] / 255.0;
+
+    var geometry = new THREE.BufferGeometry();
+
+    var positions = [
+        x - s, y - s, z,
+        x - s, y + s, z,
+        x + s, y + s, z,
+
+        x - s, y - s, z,
+        x + s, y + s, z,
+        x + s, y - s, z
+    ];
+
+    var uvs = [
+        0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+        0.0, 0.0, 1.0, 1.0, 1.0, 0.0
+    ];
+
+    var colors = [
+        r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0,
+        r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0
+    ];
+
+    var startTimes = [
+        obj.time, obj.time, obj.time,
+        obj.time, obj.time, obj.time
+    ];
+
+    var endTimes = [
+        obj.time, obj.time, obj.time,
+        obj.time, obj.time, obj.time
+    ];
+
+    var hitTimes = [
+        Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY,
+        Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY
+    ];
+
+    var centers = [
+        x, y, x, y, x, y,
+        x, y, x, y, x, y
+    ];
+
     var hitTypes = [
         0.0, 0.0, 0.0,
         0.0, 0.0, 0.0
     ];
-    
+
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
     geometry.addAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geometry.addAttribute("colorMask", new THREE.BufferAttribute(new Float32Array(colors), 4));
@@ -2723,70 +2821,70 @@ WOsu.Player.prototype.createThreeCircle = function(params) {
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
     geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
     geometry.addAttribute("hitType", new THREE.BufferAttribute(new Float32Array(hitTypes), 1));
-    
+
     var mesh = new THREE.Mesh(geometry, params.material);
-    
+
     return mesh;
 }
 
-WOsu.Player.prototype.createThreeSliderStart = function(params) {
+WOsu.Player.prototype.createThreeSliderStart = function (params) {
     var obj = params.object;
     var x = obj.x - 256;
     var y = 192 - obj.y;
     var z = params.z;
-    var s = params.mechanics.CS / 2;
+    var s = params.mechanics.CS;
     var colors = params.mechanics.colors;
     var r = colors[obj.combo][0] / 255.0;
     var g = colors[obj.combo][1] / 255.0;
     var b = colors[obj.combo][2] / 255.0;
 
     var geometry = new THREE.BufferGeometry();
-    
+
     var positions = [
         x - s, y - s, z,
         x - s, y + s, z,
         x + s, y + s, z,
-        
+
         x - s, y - s, z,
         x + s, y + s, z,
         x + s, y - s, z
     ];
-    
+
     var uvs = [
         0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
         0.0, 0.0, 1.0, 1.0, 1.0, 0.0
     ];
-    
+
     var colors = [
         r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0,
         r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0
     ];
-    
+
     var startTimes = [
         obj.time, obj.time, obj.time,
         obj.time, obj.time, obj.time
     ];
-    
+
     var endTimes = [
         obj.endTime, obj.endTime, obj.endTime,
         obj.endTime, obj.endTime, obj.endTime
     ];
-    
+
     var hitTimes = [
         Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY,
         Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY
     ];
-    
+
     var centers = [
         x, y, x, y, x, y,
         x, y, x, y, x, y
     ];
-    
+
     var hitTypes = [
         0.0, 0.0, 0.0,
         0.0, 0.0, 0.0
     ];
-    
+
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
     geometry.addAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geometry.addAttribute("colorMask", new THREE.BufferAttribute(new Float32Array(colors), 4));
@@ -2795,70 +2893,70 @@ WOsu.Player.prototype.createThreeSliderStart = function(params) {
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
     geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
     geometry.addAttribute("hitType", new THREE.BufferAttribute(new Float32Array(hitTypes), 1));
-    
+
     var mesh = new THREE.Mesh(geometry, params.material);
-    
+
     return mesh;
 }
 
-WOsu.Player.prototype.createThreeSliderEnd = function(params) {
+WOsu.Player.prototype.createThreeSliderEnd = function (params) {
     var obj = params.object;
     var x = obj.endX - 256;
     var y = 192 - obj.endY;
     var z = params.z;
-    var s = params.mechanics.CS / 2;
+    var s = params.mechanics.CS;
     var colors = params.mechanics.colors;
     var r = colors[obj.combo][0] / 255.0;
     var g = colors[obj.combo][1] / 255.0;
     var b = colors[obj.combo][2] / 255.0;
 
     var geometry = new THREE.BufferGeometry();
-    
+
     var positions = [
         x - s, y - s, z,
         x - s, y + s, z,
         x + s, y + s, z,
-        
+
         x - s, y - s, z,
         x + s, y + s, z,
         x + s, y - s, z
     ];
-    
+
     var uvs = [
         0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
         0.0, 0.0, 1.0, 1.0, 1.0, 0.0
     ];
-    
+
     var colors = [
         r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0,
         r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0
     ];
-    
+
     var startTimes = [
         obj.time, obj.time, obj.time,
         obj.time, obj.time, obj.time
     ];
-    
+
     var endTimes = [
         obj.endTime, obj.endTime, obj.endTime,
         obj.endTime, obj.endTime, obj.endTime
     ];
-    
+
     var hitTimes = [
         Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY,
         Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY
     ];
-    
+
     var centers = [
         x, y, x, y, x, y,
         x, y, x, y, x, y
     ];
-    
+
     var hitTypes = [
         1.0, 1.0, 1.0,
         1.0, 1.0, 1.0
     ];
-    
+
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
     geometry.addAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geometry.addAttribute("colorMask", new THREE.BufferAttribute(new Float32Array(colors), 4));
@@ -2867,23 +2965,23 @@ WOsu.Player.prototype.createThreeSliderEnd = function(params) {
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
     geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
     geometry.addAttribute("hitType", new THREE.BufferAttribute(new Float32Array(hitTypes), 1));
-    
+
     var mesh = new THREE.Mesh(geometry, params.material);
-    
+
     return mesh;
 }
 
-WOsu.Player.prototype.createThreeSliderBody = function(params) {
+WOsu.Player.prototype.createThreeSliderBody = function (params) {
     var obj = params.object;
     var z = params.z;
-    var s = params.mechanics.CS / 2;
+    var s = params.mechanics.CS;
     var colors = params.mechanics.colors;
     var r = colors[obj.combo][0] / 255.0;
     var g = colors[obj.combo][1] / 255.0;
     var b = colors[obj.combo][2] / 255.0;
 
     var geometry = new THREE.BufferGeometry();
-    
+
     var positions = [];
     var uvs = [];
     var indices = [];
@@ -2893,48 +2991,48 @@ WOsu.Player.prototype.createThreeSliderBody = function(params) {
     var hitTimes = [];
     var centers = [];
     var hitTypes = [];
-    
+
     // Generate the curve itself
     obj.generateBezier();
-    
+
     // Translate curve points
     var curve = [];
     var l = obj.curveX.length;
-    for (var i=0; i<l; i++) {
+    for (var i = 0; i < l; i++) {
         curve.push(new THREE.Vector2(
             obj.curveX[i] - 256, 192 - obj.curveY[i]
         ));
     }
-    
+
     // Compute curve normals
     var normals = [];
     normals.push(new THREE.Vector2(
         curve[1].y - curve[0].y, curve[0].x - curve[1].x
     ).normalize());
-    for (var i=1; i<l-1; i++) {
+    for (var i = 1; i < l - 1; i++) {
         var v0 = new THREE.Vector2(
-            curve[i].x - curve[i-1].x, curve[i].y - curve[i-1].y
+            curve[i].x - curve[i - 1].x, curve[i].y - curve[i - 1].y
         ).normalize();
         var v1 = new THREE.Vector2(
-            curve[i+1].x - curve[i].x, curve[i+1].y - curve[i].y
+            curve[i + 1].x - curve[i].x, curve[i + 1].y - curve[i].y
         ).normalize();
         v0.add(v1).normalize();
-        
+
         normals.push(new THREE.Vector2(v0.y, -v0.x));
     }
     normals.push(new THREE.Vector2(
-        curve[l-1].y - curve[l-2].y, curve[l-2].x - curve[l-1].x
+        curve[l - 1].y - curve[l - 2].y, curve[l - 2].x - curve[l - 1].x
     ).normalize());
-    
+
     // Scale normals by circle size
-    for (var i=0; i<l; i++) {
+    for (var i = 0; i < l; i++) {
         normals[i].multiplyScalar(s);
     }
-    
+
     // Construct the geometry
-    for (var i=0; i<l; i++) {
-        var v0 = new THREE.Vector2(curve[i].x, curve[i].y).add(normals[i]);
-        var v1 = new THREE.Vector2(curve[i].x, curve[i].y).sub(normals[i]);
+    for (var i = 0; i < l; i++) {
+        var v0 = curve[i].clone().add(normals[i]);
+        var v1 = curve[i].clone().sub(normals[i]);
         positions.push(v0.x, v0.y, params.z, v1.x, v1.y, params.z);
         uvs.push(0.5, 0.0, 0.5, 1.0);
         colors.push(r, g, b, 1.0, r, g, b, 1.0);
@@ -2945,16 +3043,59 @@ WOsu.Player.prototype.createThreeSliderBody = function(params) {
         hitTypes.push(2.0, 2.0);
     }
     // Add faces
-    for (var i=0; i<l-1; i++) {
+    for (var i = 0; i < l - 1; i++) {
         indices.push(
             2 * i + 0, 2 * i + 1, 2 * i + 2,
             2 * i + 2, 2 * i + 1, 2 * i + 3
         );
     }
-    
-    // Half-square end caps
-    // TODO
-    
+
+    // Semicircle end caps
+    var start = curve[0].clone().sub(curve[1]).normalize().multiplyScalar(s);
+    var end = curve[l - 1].clone().sub(curve[l - 2]).normalize().multiplyScalar(s);
+    var point;
+    // Start cap
+    point = curve[0].clone().add(normals[0]);
+    positions.push(point.x, point.y, params.z);
+    point = curve[0].clone().sub(normals[0]);
+    positions.push(point.x, point.y, params.z);
+    point = curve[0].clone().add(start).add(normals[0]);
+    positions.push(point.x, point.y, params.z);
+    point = curve[0].clone().add(start).sub(normals[0]);
+    positions.push(point.x, point.y, params.z);
+    uvs.push(0.5, 0.0, 0.5, 1.0, 0.0, 0.0, 0.0, 1.0);
+    colors.push(r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0);
+    startTimes.push(obj.time, obj.time, obj.time, obj.time);
+    endTimes.push(obj.endTime, obj.endTime, obj.endTime, obj.endTime);
+    hitTimes.push(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+    centers.push(curve[0].x, curve[0].y, curve[0].x, curve[0].y, curve[0].x, curve[0].y, curve[0].x, curve[0].y);
+    hitTypes.push(2.0, 2.0, 2.0, 2.0);
+    indices.push(
+        2 * l + 0, 2 * l + 1, 2 * l + 2,
+        2 * l + 2, 2 * l + 1, 2 * l + 3
+    );
+
+    // End cap
+    point = curve[l - 1].clone().add(normals[l - 1]);
+    positions.push(point.x, point.y, params.z);
+    point = curve[l - 1].clone().sub(normals[l - 1]);
+    positions.push(point.x, point.y, params.z);
+    point = curve[l - 1].clone().add(end).add(normals[l - 1]);
+    positions.push(point.x, point.y, params.z);
+    point = curve[l - 1].clone().add(end).sub(normals[l - 1]);
+    positions.push(point.x, point.y, params.z);
+    uvs.push(0.5, 0.0, 0.5, 1.0, 1.0, 0.0, 1.0, 1.0);
+    colors.push(r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0, r, g, b, 1.0);
+    startTimes.push(obj.time, obj.time, obj.time, obj.time);
+    endTimes.push(obj.endTime, obj.endTime, obj.endTime, obj.endTime);
+    hitTimes.push(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+    centers.push(curve[l - 1].x, curve[l - 1].y, curve[l - 1].x, curve[l - 1].y, curve[l - 1].x, curve[l - 1].y, curve[l - 1].x, curve[l - 1].y);
+    hitTypes.push(2.0, 2.0, 2.0, 2.0);
+    indices.push(
+        2 * l + 4, 2 * l + 5, 2 * l + 6,
+        2 * l + 6, 2 * l + 5, 2 * l + 7
+    );
+
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
     geometry.addAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geometry.addAttribute("index", new THREE.BufferAttribute(new Uint32Array(indices), 3));
@@ -2964,89 +3105,364 @@ WOsu.Player.prototype.createThreeSliderBody = function(params) {
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
     geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
     geometry.addAttribute("hitType", new THREE.BufferAttribute(new Float32Array(hitTypes), 1));
-    
+
     var mesh = new THREE.Mesh(geometry, params.material);
-    
+
     return mesh;
 }
 
-WOsu.Player.prototype.createThreeSpinner = function(params) {
-    return new THREE.Object3D();
+WOsu.Player.prototype.createThreeSpinner = function (params) {
+    var obj = params.object;
+    var z = params.z;
+
+    var geometry = new THREE.BufferGeometry();
+
+    var positions = [-320, -240, z, -320, 240, z,
+        320, 240, z,
+
+        -320, -240, z,
+        320, 240, z,
+        320, -240, z
+    ];
+
+    var uvs = [
+        0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+        0.0, 0.0, 1.0, 1.0, 1.0, 0.0
+    ];
+
+    var startTimes = [
+        obj.time, obj.time, obj.time,
+        obj.time, obj.time, obj.time
+    ];
+
+    var endTimes = [
+        obj.endTime, obj.endTime, obj.endTime,
+        obj.endTime, obj.endTime, obj.endTime
+    ];
+
+    var spinAmounts = [
+        0, 0, 0, 0, 0, 0
+    ];
+
+    geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.addAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geometry.addAttribute("startTime", new THREE.BufferAttribute(new Float32Array(startTimes), 1));
+    geometry.addAttribute("endTime", new THREE.BufferAttribute(new Float32Array(endTimes), 1));
+    geometry.addAttribute("spinAmount", new THREE.BufferAttribute(new Float32Array(spinAmounts), 1));
+
+    var mesh = new THREE.Mesh(geometry, params.material);
+
+    return mesh;
 }
 
 
 
-
-WOsu.Player.prototype.play = function() {
+WOsu.Player.prototype.play = function () {
     var instance = this;
 
     this.playing = true;
     this.audio.load();
-    this.audio.addEventListener("canplay", function() {
+    this.audio.addEventListener("canplay", function () {
         instance.audio.play();
     });
 
     this.frame();
 }
 
-WOsu.Player.prototype.frame = function() {
+WOsu.Player.prototype.frame = function () {
     var instance = this;
-    requestAnimationFrame(function() {
+    requestAnimationFrame(function () {
         instance.frame();
     });
 
     if (this.playing) {
         var time = this.audio.currentTime * 1000;
-        this.frame_game(time);
+
+        this.frame_storyboard(time);
+
+        // Parse the replay first so scores are updated correctly
         this.frame_replay(time);
+
+        // Update game uniforms
+        this.frame_game(time);
     }
 
     var renderer = this.three.renderer;
     renderer.render(this.three.scene, this.three.camera);
 }
 
-WOsu.Player.prototype.frame_game = function(time) {
-    var game = this.game;
-    var three = this.three;
-    var mesh;
+WOsu.Player.prototype.frame_game = function (time) {
+    var game = this.three.layers.gameplay.properties;
 
     // Show / hide approaching objects
     var threshold = this.beatmap.BeatmapMechanics.AR * 2;
-    var index = game.visibility;
+    var mesh;
     // Show
-    while (index.end < game.objectCount && (mesh = game.objectMeshes[index.end]).gameObject.time - time < threshold) {
+    while (game.objectEnd < game.objectLength && (mesh = game.objects[game.objectEnd]).gameObject.time < time + threshold) {
         mesh.visible = true;
-        index.end++;
+        game.objectEnd++;
     }
     // Hide
-    while (index.start < game.objectCount && (mesh = game.objectMeshes[index.start]).gameObject.endTime - time < -threshold) {
+    while (game.objectStart < game.objectLength && (mesh = game.objects[game.objectStart]).gameObject.endTime < time - threshold) {
         mesh.visible = false;
-        index.start++;
+        game.objectStart++;
     }
-    
+
     // Set gameplay uniforms
     var uniforms;
     uniforms = game.hitMaterial.uniforms;
     uniforms.currentTime.value = time;
     uniforms = game.spinnerMaterial.uniforms;
     uniforms.currentTime.value = time;
+    uniforms = game.approachMaterial.uniforms;
+    uniforms.currentTime.value = time;
 
+    // TODO Handler follow points
     // TODO Handle sliders and spinners as well
     // TODO Handle slider balls (but not slider ball circle!)
 }
 
-WOsu.Player.prototype.frame_replay = function(time) {
-    var rpo = this.replay; // Replay object
-    var rpg = this.game.replay; // Replay game data
-    var rpl = this.three.layers.replay; // Replay THREE objects
+WOsu.Player.prototype.frame_replay = function (time) {
+    var bmm = this.beatmap.BeatmapMechanics;
+    var replay = this.three.layers.replay.properties;
+    var data = this.replay.replayData;
+    var game = this.game;
+    var index = this.game.index;
+    var score = this.game.score;
+    var events = this.beatmap.BeatmapMechanics.events;
 
-    while (rpg.index < rpo.replayData.length - 1 && time > rpo.replayData[rpg.index + 1].time) {
-        rpg.index++;
+    while (index.replayIndex < index.replayLength) {
+        var currReplay = data[index.replayIndex];
+        var currKeys = currReplay.keys;
+        var lastReplay = (index.replayIndex > 0) ? data[index.replayIndex - 1] : currReplay;
+        var lastKeys = lastReplay.keys;
+
+        var keyDown = lastKeys > 0;
+        var keyPress = (WOsu.Replay.hasAction(currKeys, WOsu.Replay.M1) && !WOsu.Replay.hasAction(lastKeys, WOsu.Replay.M1)) || (WOsu.Replay.hasAction(currKeys, WOsu.Replay.M2) && !WOsu.Replay.hasAction(lastKeys, WOsu.Replay.M2));
+        var keyRelease = (currKeys == 0) && (lastKeys > 0);
+
+        // Advance through hold events (and missed events)
+        var pass = true;
+        while (index.eventIndex < index.eventLength && pass) {
+            pass = false;
+            var event = events[index.eventIndex];
+            var timeDiff = currReplay.time - event.time;
+            var distDiff = Math.sqrt((currReplay.x - event.x) * (currReplay.x - event.x) + (currReplay.y - event.y) * (currReplay.y - event.y));
+            if (event.isType(WOsu.GameEvent.TYPE_CIRCLE)) {
+
+                if (timeDiff > bmm.OD) {
+                    // Missed hit circle
+                    score.record0();
+                    score.recordBreak();
+                    console.log("Circle miss " + event.time);
+                    pass = true;
+                }
+
+            }
+            else if (event.isType(WOsu.GameEvent.TYPE_SLIDER_START)) {
+
+                if (timeDiff > bmm.OD) {
+                    // Only the slider start is subject to od lock
+                    console.log("Slider start miss");
+                    score.recordBreak();
+                    pass = true;
+                    // Add to the current list of sliders
+                    game.currentSliders.push(event.parent);
+                }
+
+            }
+            else if (event.isType(WOsu.GameEvent.TYPE_SLIDER_END)) {
+
+                if (timeDiff > 0) {
+                    if (event.parent.data.hold) {
+                        event.parent.data.hit++;
+                        // Compute score
+                        if (event.parent.data.hit == event.parent.data.total) {
+                            // All ticks hit
+                            score.record300();
+                        }
+                        else if (event.parent.data.hit * 2 >= event.parent.data.total) {
+                            // At least half ticks hit
+                            score.record100();
+                        }
+                        else {
+                            // At least one hit
+                            score.record50();
+                        }
+                        pass = true;
+                        console.log("1 " + event.parent.data.hit + " " + event.parent.data.total);
+
+                        score.recordCombo();
+                    }
+                    else {
+                        if (event.parent.data.hit * 2 >= event.parent.data.total) {
+                            // At least half ticks hit
+                            score.record100();
+                        }
+                        else if (event.parent.data.hit > 0) {
+                            // At least one hit
+                            score.record50();
+                        }
+                        else {
+                            // Completely missed
+                            score.record0();
+                        }
+                        pass = true;
+                        console.log("2 " + event.parent.data.hit + " " + event.parent.data.total);
+                    }
+                    // Remove from the current list of sliders
+                    game.currentSliders.splice(game.currentSliders.indexOf(event.parent), 1);
+                }
+
+            }
+            else if (event.isType(WOsu.GameEvent.TYPE_SLIDER)) {
+
+                // Slider parts are immediate misses
+                if (timeDiff > 0) {
+                    if (event.parent.data.hold) { // Hit
+                        if (event.isType(WOsu.GameEvent.TYPE_SLIDER_POINT)) {
+                            score.record30();
+                        }
+                        else if (event.isType(WOsu.GameEvent.TYPE_SLIDER_TICK)) {
+                            score.record10();
+                        }
+                        score.recordCombo();
+                        event.parent.data.hit++;
+                        pass = true;
+                    }
+                    else { // Miss
+                        console.log("Slider break " + event.time);
+                        console.log(event.parent.data);
+                        score.recordBreak();
+                        pass = true;
+                    }
+                }
+
+            }
+            else if (event.isType(WOsu.GameEvent.TYPE_SPINNER_START)) {
+                pass = true;
+            }
+            else if (event.isType(WOsu.GameEvent.TYPE_SPINNER_END)) {
+                // TODO Spinner end
+                score.record300();
+                score.recordCombo();
+                pass = true;
+            }
+            else {
+                pass = true;
+            }
+
+            if (pass) {
+                index.eventIndex++;
+            }
+        }
+
+        // Check for edges (circles and slider starts)
+        // TODO NOW Check for distance
+        if (index.eventIndex < index.eventLength && keyPress && index.replayEdge <= index.replayIndex) { // Rising edge
+
+            var event = events[index.eventIndex];
+            var timeDiff = Math.abs(event.time - currReplay.time);
+            var distDiff = Math.sqrt((currReplay.x - event.x) * (currReplay.x - event.x) + (currReplay.y - event.y) * (currReplay.y - event.y));
+            if (event.isType(WOsu.GameEvent.TYPE_CIRCLE) && distDiff <= bmm.CS) {
+                
+                if (timeDiff < bmm.hit300) {
+                    score.record300();
+                    score.recordCombo();
+                    index.eventIndex++;
+                }
+                else if (timeDiff < bmm.hit100) {
+                    score.record100();
+                    score.recordCombo();
+                    index.eventIndex++;
+                }
+                else if (timeDiff < bmm.hit50) {
+                    score.record50();
+                    score.recordCombo();
+                    index.eventIndex++;
+                }
+                else {
+                    // TODO Circles miss if too early (?)
+                }
+                
+                event.data.finish = true;
+
+                // TODO Modify hitTime attribute
+                
+            }
+            else if (event.isType(WOsu.GameEvent.TYPE_SLIDER_START) && distDiff <= bmm.CS) {
+
+                if (timeDiff < bmm.OD) {
+                    event.parent.data.hit++;
+                    event.parent.data.hold = true;
+                    score.recordCombo();
+                    index.eventIndex++;
+                }
+                else if (timeDiff < bmm.AR) {
+                    // Hitting too early counts as a miss
+                    console.log("Slider start early");
+                    score.recordBreak();
+                    index.eventIndex++;
+                }
+                // Add to the current list of sliders
+                game.currentSliders.push(event.parent);
+
+            }
+
+            index.replayEdge = index.replayIndex + 1;
+
+        }
+        else if (keyRelease) { // Complete falling edge
+
+            // TODO
+            index.replayEdge = index.replayIndex + 1;
+
+        }
+
+        // Detect any non-fixed events:
+        //     Slider breaks by moving out of the circle or lifting up the key
+        //     Slider holds by keydown over the slider
+        //     Spinner spinning
+        var keyStillDown = currKeys > 0; // Keydown referring to the current time
+        for (var i = 0; i < game.currentSliders.length; i++) {
+            var slider = game.currentSliders[i];
+            var distance = slider.gameObject.getDistance(currReplay.time, currReplay.x, currReplay.y);
+            if (slider.data.hold) {
+                if (keyRelease || distance > 2 * bmm.CS) {
+                    slider.data.hold = false;
+                    console.log(keyRelease + " " + distance);
+                }
+            }
+            else {
+                if (keyStillDown && distance <= bmm.CS) {
+                    slider.data.hold = true;
+                }
+            }
+        }
+        if (game.currentSpinners.length > 0) {
+            var spinner = game.currentSpinners[0];
+            if (keyDown && keyStillDown) {
+                // TODO Spinner spinning
+                var lastAngle = Math.atan2(lastReplay.y, lastReplay.x);
+                var currAngle = Math.atan2(currReplay.y, currReplay.x);
+                var diff = (Math.abs(lastAngle - currAngle) / (2.0 * Math.PI)) % 1.0;
+                diff = (diff > 0.5) ? 1.0 - diff : diff;
+                spinner.parent.data.spins += diff;
+            }
+        }
+
+        // Advance replay
+        if (index.replayIndex < index.replayLength - 1 && time > data[index.replayIndex + 1].time) {
+            index.replayIndex++;
+        }
+        else {
+            break;
+        }
     }
 
     // Get the current and next sets of replay data
-    var rd = rpo.replayData[rpg.index];
-    var nd = (rpg.index === rpo.replayData.length - 1) ? rd : rpo.replayData[rpg.index + 1];
+    var rd = data[index.replayIndex];
+    var nd = (index.replayIndex === index.replayLength - 1) ? rd : data[index.replayIndex + 1];
 
     // Transform to cartesian coordinates
     var p1 = new THREE.Vector3(rd.x - 256, 192 - rd.y, 0);
@@ -3054,7 +3470,7 @@ WOsu.Player.prototype.frame_replay = function(time) {
 
     // Compute interpolation between the sets
     var interp = (nd.time - rd.time === 0) ? 0 : (time - rd.time) / (nd.time - rd.time);
-    var cursor = this.game.cursorMesh;
+    var cursor = replay.cursorMesh;
     cursor.position.lerpVectors(p1, p2, interp);
 
     // Set cursor uniforms
@@ -3063,150 +3479,132 @@ WOsu.Player.prototype.frame_replay = function(time) {
     uniforms.isHit.value = (rd.keys > 0) ? 1 : 0;
     uniforms.hitTime.value = (rd.keys > 0) ? rd.time : rd.lastReleaseTime;
 }
-WOsu.Skin = function(url) {
-    this.url = url || "";
-    this.textures = {};
-    this.status = 0;
+
+WOsu.Player.prototype.frame_storyboard = function (time) {
+    // TODO Storyboard
 }
 
-WOsu.Skin.prototype.constructor = WOsu.Skin;
-
-WOsu.Skin.textureList = { // List of textures
-    approachcircle: "approachcircle.png",
-
-    cursor: "cursor.png",
-    cursortrail: "cursortrail.png",
-
-    hitcircle: "hitcircle.png",
-    hitcircle_overlay: "hitcircleoverlay.png",
-
-    slider_b: "sliderb.png",
-    slider_followcircle: "sliderfollowcircle.png",
-    slider_point10: "sliderpoint10.png",
-    slider_point30: "sliderpoint30.png",
-    slider_scorepoint: "sliderscorepoint.png",
-    reversearrow: "reversearrow.png",
-
-    spinner_approachcircle: "spinner-approachcircle.png",
-    spinner_background: "spinner-background.png",
-    spinner_circle: "spinner-circle.png",
-    spinner_clear: "spinner-clear.png",
-    spinner_metre: "spinner-metre.png",
-    spinner_osu: "spinner-osu.png",
-    spinner_rpm: "spinner-rpm.png",
-    spinner_spin: "spinner-spin.png",
-
-    hit_0: "hit0.png",
-    hit_50: "hit50.png",
-    hit_50k: "hit50k.png",
-    hit_100: "hit100.png",
-    hit_100k: "hit100k.png",
-    hit_300: "hit300.png",
-    hit_300g: "hit300g.png",
-    hit_300k: "hit300k.png",
-
-    lighting: "lighting.png",
-
-    default_0: "default-0.png",
-    default_1: "default-1.png",
-    default_2: "default-2.png",
-    default_3: "default-3.png",
-    default_4: "default-4.png",
-    default_5: "default-5.png",
-    default_6: "default-6.png",
-    default_7: "default-7.png",
-    default_8: "default-8.png",
-    default_9: "default-9.png",
-
-    score_0: "score-0.png",
-    score_1: "score-1.png",
-    score_2: "score-2.png",
-    score_3: "score-3.png",
-    score_4: "score-4.png",
-    score_5: "score-5.png",
-    score_6: "score-6.png",
-    score_7: "score-7.png",
-    score_8: "score-8.png",
-    score_9: "score-9.png",
-    score_comma: "score-comma.png",
-    score_dot: "score-dot.png",
-    score_percent: "score-percent.png",
-    score_x: "score-x.png",
-
-    scorebar_bg: "scorebar-bg.png",
-    scorebar_colour: "scorebar-colour.png",
-    scorebar_ki: "scorebar-ki.png",
-    scorebar_kidanger: "scorebar-kidanger.png",
-    scorebar_kidanger2: "scorebar-kidanger2.png",
-
-    section_fail: "section-fail.png",
-    section_pass: "section-pass.png",
-
-    volume: "volume-bg.png"
-};
-WOsu.SkinLoader = {};
-
 /**
-    Folder of the default skin elements. Elements in this folder must be complete and accessible.
- */
-WOsu.SkinLoader.defaultURL = "Skins/default/";
-
-/**
-    Load skin images from a root path.
- */
-// FUTURE read skin.ini, 4k, 5k etc.
-// FUTURE handle animated skin elements
-// FUTURE handle high resolution textures
-WOsu.SkinLoader.load = function(loc, progress) {
-    var instance = new WOsu.Skin(loc);
-    var lt = this.loadedTextures = {};
-    var textureList = WOsu.Skin.textureList;
-
-    // Grab an array of texture names
-    var textures = [];
-    for (var i in textureList) {
-        textures.push(i);
-    }
+    Handles scoring
+*/
+WOsu.ScoreManager = function(mechanics) {
+    this.mechanics = mechanics;
     
-    var total = textures.length;
-    var loaded = 0;
+    this.totalScore = 0;
+    this.totalAccuracy = 0;
+    this.currentCombo = 0;
+    this.maxCombo = 0;
     
-    function localProgress(id, tex) {
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        instance.textures[id] = tex;
-        
-        loaded++;
-
-        progress(loaded, total);
-    }
+    this.hit300 = 0;
+    this.hit200 = 0;
+    this.hit100 = 0;
+    this.hit50 = 0;
+    this.hit0 = 0;
     
-    textures.forEach(function(t) {
-        THREE.ImageUtils.loadTexture(
-            loc + textureList[t],
-            undefined,
-            function(tex) {
-                localProgress(t, tex);
-            },
-            function(evt) {
-                // Attempt to load default skin
-                loc = WOsu.SkinLoader.defaultURL;
-                THREE.ImageUtils.loadTexture(
-                    loc + textureList[t],
-                    undefined,
-                    function(tex) {
-                        localProgress(t, tex);
-                    },
-                    function(evt) {
-                        localProgress(t, undefined);
-                    }
-                );
-            }
-        );
-    });
-
-    return instance;
+    this.hit300g = 0;
+    this.hit300k = 0;
+    this.hit100k = 0;
+    
+    this.combos = [];
 }
+
+WOsu.ScoreManager.prototype.constructor = WOsu.ScoreManager;
+
+/**
+    Compute the accuracy.
+*/
+WOsu.ScoreManager.prototype.getAccuracy = function() {
+    var totalHits = this.hit300 + this.hit200 + this.hit100 + this.hit50 + this.hit0;
+    var weightedHits = 3.0 / 3.0 * this.hit300 + 2.0 / 3.0 * this.hit200 + 1.0 / 3.0  * this.hit100 + 0.5 / 3.0 * this.hit50 + 0.0 / 3.0 * this.hit0;
+    
+    if (totalHits == 0) {
+        this.totalAccuracy = 0;
+    }
+    else {
+        this.totalAccuracy = weightedHits / totalHits;
+    }
+    return this.totalAccuracy;
+}
+
+/**
+    Record an incrase in combo.
+*/
+WOsu.ScoreManager.prototype.recordCombo = function() {
+    this.currentCombo++;
+    if (this.currentCombo > this.maxCombo) {
+        this.maxCombo = this.currentCombo;
+    }
+}
+
+/**
+    Record a combo break.
+*/
+WOsu.ScoreManager.prototype.recordBreak = function() {
+    this.combos.push(this.currentCombo);
+    this.currentCombo = 0;
+}
+
+/**
+    Record a score. Call this BEFORE recordCombo.
+*/
+WOsu.ScoreManager.prototype.recordScore = function(amount) {
+    var comboMultiplier = this.currentCombo - 1;
+    if (comboMultiplier < 0) {
+        comboMultiplier = 0;
+    }
+    var extra = comboMultiplier * this.mechanics.difficultyMultiplier * this.mechanics.modMultiplier;
+    var totalAmount = amount + ~~(amount * extra / 25.0);
+    this.totalScore += totalAmount;
+}
+
+/**
+    Record a 300. Call this BEFORE recordCombo.
+*/
+WOsu.ScoreManager.prototype.record300 = function() {
+    this.hit300++;
+    this.recordScore(300);
+}
+
+/**
+    Record a 100. Call this BEFORE recordCombo.
+*/
+WOsu.ScoreManager.prototype.record100 = function() {
+    this.hit100++;
+    this.recordScore(100);
+}
+
+/**
+    Record a 50. Call this BEFORE recordCombo.
+*/
+WOsu.ScoreManager.prototype.record50 = function() {
+    this.hit50++;
+    this.recordScore(50);
+}
+
+/**
+    Record a miss. Call this BEFORE recordCombo.
+*/
+WOsu.ScoreManager.prototype.record0 = function() {
+    this.hit0++;
+    this.recordScore(0);
+}
+
+/**
+    Record a slider tick.
+*/
+WOsu.ScoreManager.prototype.record10 = function() {
+    this.totalScore += 10;
+}
+
+/**
+    Record a slider point.
+*/
+WOsu.ScoreManager.prototype.record30 = function() {
+    this.totalScore += 30;
+}
+
+// TODO Other record amounts + k, g
+
 WOsu.Matrix3 = function(args) {
 	this.matrix = new Array(9);
 	try {
@@ -3455,5 +3853,149 @@ WOsu.ReplayLoader.loadRaw = function(data, finish, progress) {
     );
 
     return replay;
+}
+WOsu.Skin = function(url) {
+    this.url = url || "";
+    this.textures = {};
+    this.status = 0;
+}
+
+WOsu.Skin.prototype.constructor = WOsu.Skin;
+
+WOsu.Skin.textureList = { // List of textures
+    approachcircle: "approachcircle.png",
+
+    cursor: "cursor.png",
+    cursortrail: "cursortrail.png",
+
+    hitcircle: "hitcircle.png",
+    hitcircle_overlay: "hitcircleoverlay.png",
+
+    slider_b: "sliderb.png",
+    slider_followcircle: "sliderfollowcircle.png",
+    slider_point10: "sliderpoint10.png",
+    slider_point30: "sliderpoint30.png",
+    slider_scorepoint: "sliderscorepoint.png",
+    reversearrow: "reversearrow.png",
+
+    spinner_approachcircle: "spinner-approachcircle.png",
+    spinner_background: "spinner-background.png",
+    spinner_circle: "spinner-circle.png",
+    spinner_clear: "spinner-clear.png",
+    spinner_metre: "spinner-metre.png",
+    spinner_osu: "spinner-osu.png",
+    spinner_rpm: "spinner-rpm.png",
+    spinner_spin: "spinner-spin.png",
+
+    hit_0: "hit0.png",
+    hit_50: "hit50.png",
+    hit_50k: "hit50k.png",
+    hit_100: "hit100.png",
+    hit_100k: "hit100k.png",
+    hit_300: "hit300.png",
+    hit_300g: "hit300g.png",
+    hit_300k: "hit300k.png",
+
+    lighting: "lighting.png",
+
+    default_0: "default-0.png",
+    default_1: "default-1.png",
+    default_2: "default-2.png",
+    default_3: "default-3.png",
+    default_4: "default-4.png",
+    default_5: "default-5.png",
+    default_6: "default-6.png",
+    default_7: "default-7.png",
+    default_8: "default-8.png",
+    default_9: "default-9.png",
+
+    score_0: "score-0.png",
+    score_1: "score-1.png",
+    score_2: "score-2.png",
+    score_3: "score-3.png",
+    score_4: "score-4.png",
+    score_5: "score-5.png",
+    score_6: "score-6.png",
+    score_7: "score-7.png",
+    score_8: "score-8.png",
+    score_9: "score-9.png",
+    score_comma: "score-comma.png",
+    score_dot: "score-dot.png",
+    score_percent: "score-percent.png",
+    score_x: "score-x.png",
+
+    scorebar_bg: "scorebar-bg.png",
+    scorebar_colour: "scorebar-colour.png",
+    scorebar_ki: "scorebar-ki.png",
+    scorebar_kidanger: "scorebar-kidanger.png",
+    scorebar_kidanger2: "scorebar-kidanger2.png",
+
+    section_fail: "section-fail.png",
+    section_pass: "section-pass.png",
+
+    volume: "volume-bg.png"
+};
+WOsu.SkinLoader = {};
+
+/**
+    Folder of the default skin elements. Elements in this folder must be complete and accessible.
+ */
+WOsu.SkinLoader.defaultURL = "Skins/default/";
+
+/**
+    Load skin images from a root path.
+ */
+// FUTURE read skin.ini, 4k, 5k etc.
+// FUTURE handle animated skin elements
+// FUTURE handle high resolution textures
+WOsu.SkinLoader.load = function(loc, progress) {
+    var instance = new WOsu.Skin(loc);
+    var lt = this.loadedTextures = {};
+    var textureList = WOsu.Skin.textureList;
+
+    // Grab an array of texture names
+    var textures = [];
+    for (var i in textureList) {
+        textures.push(i);
+    }
+    
+    var total = textures.length;
+    var loaded = 0;
+    
+    function localProgress(id, tex) {
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        instance.textures[id] = tex;
+        
+        loaded++;
+
+        progress(loaded, total);
+    }
+    
+    textures.forEach(function(t) {
+        THREE.ImageUtils.loadTexture(
+            loc + textureList[t],
+            undefined,
+            function(tex) {
+                localProgress(t, tex);
+            },
+            function(evt) {
+                // Attempt to load default skin
+                loc = WOsu.SkinLoader.defaultURL;
+                THREE.ImageUtils.loadTexture(
+                    loc + textureList[t],
+                    undefined,
+                    function(tex) {
+                        localProgress(t, tex);
+                    },
+                    function(evt) {
+                        localProgress(t, undefined);
+                    }
+                );
+            }
+        );
+    });
+
+    return instance;
 }
 //# sourceMappingURL=WOsu.js.map
