@@ -27,7 +27,7 @@
     <script type="text/javascript">
         var ORV = {};
 
-         // Entrypoint
+        // Entrypoint
         $(document).ready(function() {
             // These brackets make collapsing levels easier
             var dmenu, dgame; {
@@ -43,7 +43,7 @@
                 ORV.winHeight = window.innerHeight;
                 ORV.debug = {};
 
-                ORV.player = new WOsu.Player({
+                ORV.player = new WOsu.ThreePlayer({
                     width: ORV.winWidth,
                     height: ORV.winHeight,
 
@@ -239,7 +239,7 @@
                             $(document.createElement("div"))
                             .css(labelcss)
                             .html("Sample Replays:")
-                    );
+                        );
                     var select =
                         $(document.createElement("select"));
                     var samples = [];
@@ -268,7 +268,7 @@
                             $(document.createElement("div"))
                             .css(labelcss)
                             .html("OR by URL:")
-                    );
+                        );
                     var input =
                         $(document.createElement("input"))
                         .attr("type", "text")
@@ -291,7 +291,7 @@
                             $(document.createElement("div"))
                             .css(labelcss)
                             .html("OR by Upload:")
-                    );
+                        );
                     var form =
                         $(document.createElement("form"))
                         .attr("method", "POST")
@@ -333,7 +333,7 @@
                             $(document.createElement("div"))
                             .css(labelcss)
                             .html("Sample Skins:")
-                    );
+                        );
                     var select =
                         $(document.createElement("select"));
                     var samples = [];
@@ -362,7 +362,7 @@
                             $(document.createElement("div"))
                             .css(labelcss)
                             .html("OR by URL:")
-                    );
+                        );
                     var input =
                         $(document.createElement("input"))
                         .attr("type", "text")
@@ -440,7 +440,7 @@
                             $(document.createElement("div"))
                             .css(labelcss)
                             .html("URL:")
-                    );
+                        );
                     var input =
                         $(document.createElement("input"))
                         .attr("type", "text")
@@ -485,7 +485,7 @@
                         .concat(skinSelect.element)
                         .concat(skinURL.element)
                         .concat("<br />")
-                );
+                    );
                 replayWindow.error = replayError;
 
                 var optionLayers = generateLayerOptions();
@@ -511,7 +511,7 @@
                         .concat("<h2>API</h2>")
                         .concat(apiURL.element)
                         .concat("<br />")
-                );
+                    );
                 optionWindow.error = optionError;
 
                 replayWindow.hide();
@@ -682,7 +682,7 @@
 
         });
 
-         // Show the current loading progress
+        // Show the current loading progress
         function showProgress(type, message) {
             if (message.trim().length == 0) message = "&nbsp;";
             var target = ORV.options.progressStati[type];
@@ -691,7 +691,7 @@
             }
         }
 
-         // Show the completion animation
+        // Show the completion animation
         function showCompletion() {
             console.log("Completed");
 
@@ -705,12 +705,12 @@
             }, 1000);
         }
 
-         // Show the error
+        // Show the error
         function showError(type, message) {
             console.log(type + ": " + message);
         }
 
-         // Initialize the game with the given options
+        // Initialize the game with the given options
         function initGame(options, errorCallback) {
             if (options == null) {
                 errorCallback(0, "Something wrong happened...");
@@ -756,11 +756,11 @@
 
                 options.gameWindow.html("");
                 options.gameWindow.append(ORV.player.elements.three);
+                options.gameWindow.append(ORV.player.elements.debug);
             });
         }
-    </script>
 
-    <!-- Part 3: best_fail_ -->
+    </script>
 
 </body>
 

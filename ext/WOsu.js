@@ -51,6 +51,17 @@ WOsu.resync = function(instance, funcs, callback) {
     });
 }
 
+/**
+    Repeat an array a certain number of times
+*/
+WOsu.repeat = function(arr, times) {
+    var rep = [];
+    while (times-->0) {
+        rep = rep.concat(arr);
+    }
+    return rep;
+}
+
 WOsu.Beatmap = function () {
     this.BeatmapData = new WOsu.BeatmapData();
     this.BeatmapEvents = new WOsu.BeatmapEvents();
@@ -198,7 +209,7 @@ WOsu.Beatmap.prototype.getTimingPoint = function (time) {
 WOsu.Beatmap.prototype.loadMechanics = function (mods) {
     mods = (mods === undefined) ? 0 : mods;
 
-    var bm = this.BeatmapMechanics;
+    var bm = new WOsu.BeatmapMechanics();;
     var bd = this.BeatmapData;
 
     // Apply mods
@@ -209,9 +220,13 @@ WOsu.Beatmap.prototype.loadMechanics = function (mods) {
 
     // Compute total difficulty
     bm.difficulty = cs + od + hp;
-    bm.difficultyMultiplier = [6, 13, 18, 25, 31].reduce(function (p, c) {
-        return (bm.difficulty > c) ? p + 1 : p;
-    }, 2);
+    bm.difficultyMultiplier = [8, 16, 23, 31].reduce(function (p, c) {
+        return (bm.difficulty >= c) ? p + 1 : p;
+    }, 1);
+    // This multiplier is finicky.....
+    // Assume hard replays and a 4x multiplier =\
+    // TODO Fix this properly, or get help
+    bm.difficultyMultiplier = 4;
 
     // Compute mod multipliers
     for (var mod in WOsu.Beatmap.mods) {
@@ -233,6 +248,7 @@ WOsu.Beatmap.prototype.loadMechanics = function (mods) {
     }
     else if (WOsu.Beatmap.hasMod(mods, WOsu.Beatmap.mods.Easy)) {
         ar = ar * 0.5;
+        od = od * 0.5;
     }
 
     bm.AR = (ar <= 5) ? 1800 - ar * 120 : 1200 - (ar - 5) * 150;
@@ -241,6 +257,12 @@ WOsu.Beatmap.prototype.loadMechanics = function (mods) {
     bm.hit300 = 80 - od * 6;
     bm.hit100 = 140 - od * 8;
     bm.hit50 = 200 - od * 10;
+    // 100bpm 8 beats = 4800 ms
+    // OD0  = 8 spins for 300
+    // OD5  = 12 spins for 300
+    // OD10 = ?? spins for 300
+    // TODO Spin amount multiplier
+    bm.spin = 2.0 + od / 5.0;
 
     var be = this.BeatmapEvents;
     bm.minBPM = -1;
@@ -266,23 +288,27 @@ WOsu.Beatmap.prototype.loadMechanics = function (mods) {
         [0x00, 0x80, 0xC0],
         [0xFF, 0xFF, 0x80]
     ];
+    
+    return bm;
 }
 
 /**
     Compute all game events.
 */
 WOsu.Beatmap.prototype.loadEvents = function () {
-    var bm = this.BeatmapMechanics;
     var bo = this.BeatmapObjects;
 
+    var events = [];
     for (var i = 0; i < bo.length; i++) {
-        bm.events = bm.events.concat(WOsu.GameEvent.getEvents(bo[i]));
+        events = events.concat(WOsu.GameEvent.getEvents(bo[i]));
     }
 
     // Sort events in order
-    bm.events.sort(function (a, b) {
+    events.sort(function (a, b) {
         return a.time - b.time;
     });
+    
+    return events;
 }
 
 WOsu.BeatmapLoader = {};
@@ -548,6 +574,7 @@ WOsu.BeatmapMechanics = function() {
     this.hit300 = 0;
     this.hit100 = 0;
     this.hit50 = 0;
+    this.spin = 1;
     
     // Total difficulty score multiplier
     this.difficulty = 0;
@@ -560,9 +587,6 @@ WOsu.BeatmapMechanics = function() {
     
     // Combo colors
     this.colors = [];
-    
-    // Game hit events
-    this.events = [];
 }
 
 WOsu.BeatmapMechanics.prototype.constructor = WOsu.BeatmapMechanics;
@@ -1136,6 +1160,10 @@ WOsu.GameEvent.getEvents = function (obj) {
         events.push(new WOsu.GameEvent(WOsu.GameEvent.TYPE_SPINNER_END, obj.endTime, obj.x, obj.y, obj, parent));
         
         parent.data.spins = 0;
+        // TODO Approximate
+        parent.data.clear = obj.spinnerTime / 1000.0;
+        parent.data.samples = [];
+        parent.data.sampleTotal = 0;
 
     }
     return events;
@@ -1398,59 +1426,59 @@ WOsu.Player = function (options) {
 
     this.elements = {
         audio: null,
-        three: null
+        three: null,
+        debug: null
     };
 
-    // Initialize Three.js
-    this.initThree();
+    // Initialize the debugging scheme
+    this.initDebug();
 }
 
 WOsu.Player.prototype.constructor = WOsu.Player;
 
-WOsu.Player.prototype.initThree = function () {
-    var instance = this;
+WOsu.Player.prototype.setProgressCallback = function (callback) {
+    this.callback.progress = callback;
+}
 
-    // New renderer, no sorting
-    var renderer = new THREE.WebGLRenderer();
-    renderer.setClearColor(0x000000, 0.0);
-    renderer.setSize(this.width, this.height);
-    renderer.sortObjects = false;
+WOsu.Player.prototype.setCompletionCallback = function (callback) {
+    this.callback.completion = callback;
+}
 
-    // Three.js Scene
-    var scene = new THREE.Scene();
+WOsu.Player.prototype.setErrorCallback = function (callback) {
+    this.callback.error = callback;
+}
 
-    // TODO Rendering target for layers
-    var target = new THREE.WebGLRenderTarget(this.width, this.height, {
-        minFilter: THREE.LinearFilter,
-        magFilter: THREE.NearestFilter,
-        format: THREE.RGBFormat
-    });
+WOsu.Player.prototype.initDebug = function () {
+    var debug = document.createElement("div");
+    var css = {
+        "position": "absolute",
+        "top": "20px",
+        "left": "20px",
 
-    // Allow cross origin loading (?)
-    THREE.ImageUtils.crossOrigin = "";
+        "white-space": "pre-wrap",
 
-    // Need to scale to at least 640 x 480 units
-    var ratio = this.height / this.width;
-    var camera;
-    if (ratio > 0.75) { // Width limit
-        camera = new THREE.OrthographicCamera(-320, 320, 320 * ratio, -320 * ratio, 1, 1e5);
+        "font-family": "'Lucida Console', Monaco, monospace",
+        "font-size": "24px",
+
+        "color": "white",
+        "text-shadow": "0px 0px 2px black"
+    };
+    for (var i in css) {
+        debug.style[i] = css[i];
     }
-    else { // Height limit
-        camera = new THREE.OrthographicCamera(-240 / ratio, 240 / ratio, 240, -240, 1, 1e5);
-    }
-    camera.position.set(0, 0, 2);
-    camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-    this.three = {
-        renderer: renderer,
-        camera: camera,
-        scene: scene,
-        target: target
+    debug.buffer = "";
+    debug.clear = function () {
+        debug.buffer = "";
+    };
+    debug.write = function (i) {
+        debug.buffer += i;
+    };
+    debug.update = function () {
+        debug.innerHTML = debug.buffer;
     };
 
-    // TODO handle resizing
-
-    this.elements.three = renderer.domElement;
+    this.elements.debug = debug;
 }
 
 WOsu.Player.prototype.load = function (options) {
@@ -1494,7 +1522,7 @@ WOsu.Player.prototype.load = function (options) {
                 fn: instance.loadAudio,
                 args: []
             }, {
-                fn: instance.loadThree,
+                fn: instance.loadRenderer,
                 args: []
             }], function () {
                 instance.callback.completion();
@@ -1504,18 +1532,6 @@ WOsu.Player.prototype.load = function (options) {
 
     // TODO Read storyboard
     // this.initStoryboard();
-}
-
-WOsu.Player.prototype.setProgressCallback = function (callback) {
-    this.callback.progress = callback;
-}
-
-WOsu.Player.prototype.setCompletionCallback = function (callback) {
-    this.callback.completion = callback;
-}
-
-WOsu.Player.prototype.setErrorCallback = function (callback) {
-    this.callback.error = callback;
 }
 
 WOsu.Player.prototype.loadSkin = function (resyncFinish, loc) {
@@ -1647,11 +1663,11 @@ WOsu.Player.prototype.loadBeatmap = function (finish) {
         // TODO Transformations because of Easy/HR?
         // Hidden and Flashlight should go into the shaders
         // Technical calculations
-        instance.beatmap.loadMechanics();
-        // TODO Include mods
         //instance.beatmap.loadMechanics(this.replay.mods);
+        // TODO Include mods
         // Create and sort game events
-        instance.beatmap.loadEvents();
+        // instance.beatmap.loadEvents();
+        //instance.beatmap.loadEvents(this.replay.mods);
 
         instance.callback.progress("Beatmap", "Finished");
         finish();
@@ -1702,15 +1718,20 @@ WOsu.Player.prototype.loadBeatmap = function (finish) {
     Load gameplay variables
 */
 WOsu.Player.prototype.loadGameplay = function () {
+    var mechanics = this.beatmap.loadMechanics(this.replay.mods);
+    var events = this.beatmap.loadEvents(this.replay.mods);
+
     this.game = {
-        score: new WOsu.ScoreManager(this.beatmap.BeatmapMechanics),
+        score: new WOsu.ScoreManager(mechanics),
         index: {
             eventIndex: 0,
-            eventLength: this.beatmap.BeatmapMechanics.events.length,
+            eventLength: events.length,
             replayIndex: 0,
             replayEdge: 0,
             replayLength: this.replay.replayData.length
         },
+        mechanics: mechanics,
+        events: events,
         currentCircles: [],
         currentSliders: [],
         currentSpinners: []
@@ -1736,33 +1757,11 @@ WOsu.Player.prototype.loadAudio = function (loadResync) {
 //        gamemode specific files, e.g. StandardPlayer, TaikoPlayer, etc.
 // FUTURE For ctb player, figure out how random positions are seeded
 
-WOsu.Player.prototype.loadThree = function (loadResync) {
-    var instance = this;
-
-    this.callback.progress("Three", "Loading objects");
-
-    this.three.layers = {};
-
-    this.three.materials = {};
-
-    WOsu.resync(instance, [{
-        fn: instance.loadThreeStoryboard
-    }, {
-        fn: instance.loadThreeGameplay
-    }, {
-        fn: instance.loadThreeReplay
-    }, {
-        fn: instance.loadThreeUI
-    }, {
-        fn: instance.loadThreeStatistics
-    }], function () {
-        // Finish up
-        instance.loadThreeScene();
-
-        instance.callback.progress("Three", "Finished");
-
-        loadResync();
-    });
+/**
+    Load the renderer. This is the last step of the loading process.
+*/
+WOsu.Player.prototype.loadRenderer = function (loadResync) {
+    loadResync();
 }
 
 /**
@@ -1810,11 +1809,68 @@ WOsu.Player.prototype.loadThreeStoryboard = function (threeResync) {
 WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
     // Hit objects
     var gameplay = new THREE.Object3D();
-    var bme = this.beatmap.BeatmapEvents.BackgroundEvents;
     var bmo = this.beatmap.BeatmapObjects;
-    var bmm = this.beatmap.BeatmapMechanics;
+    var bmm = this.game.mechanics;
+    var bme = this.game.events;
     var textures = this.skin.textures;
 
+    var scoreUniforms = {
+        currentTime: {
+            type: 'f',
+            value: Number.NEGATIVE_INFINITY
+        },
+        approachRate: {
+            type: 'f',
+            value: bmm.AR
+        },
+        overallDifficulty: {
+            type: 'f',
+            value: bmm.OD
+        },
+        circleSize: {
+            type: 'f',
+            value: bmm.CS
+        },
+
+        hit300: {
+            type: 't',
+            value: textures.hit_300
+        },
+        hit100: {
+            type: 't',
+            value: textures.hit_100
+        },
+        hit50: {
+            type: 't',
+            value: textures.hit_50
+        },
+        hit0: {
+            type: 't',
+            value: textures.hit_0
+        }
+    };
+    var scoreAttributes = {
+        hitTime: {
+            type: 'f'
+        },
+        score: {
+            type: 'f'
+        },
+        center: {
+            type: 'v3'
+        }
+    };
+    var scoreMaterial = new THREE.ShaderMaterial({
+        uniforms: scoreUniforms,
+        attributes: scoreAttributes,
+
+        vertexShader: WOsu.Player.scoreShader.vertexShader,
+        fragmentShader: WOsu.Player.scoreShader.fragmentShader,
+
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    
     var approachUniforms = {
         currentTime: {
             type: 'f',
@@ -1849,7 +1905,7 @@ WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
             type: 'f'
         },
         center: {
-            type: 'v2'
+            type: 'v3'
         }
     };
     var approachMaterial = new THREE.ShaderMaterial({
@@ -1863,7 +1919,7 @@ WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
         transparent: true
     });
 
-    var hitUniforms = {
+    var circleUniforms = {
         currentTime: {
             type: 'f',
             value: Number.NEGATIVE_INFINITY
@@ -1905,7 +1961,74 @@ WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
             ]
         }
     };
-    var hitAttributes = {
+    var circleAttributes = {
+        colorMask: {
+            type: 'v4'
+        },
+        startTime: {
+            type: 'f'
+        },
+        hitTime: {
+            type: 'f'
+        },
+        center: {
+            type: 'v3'
+        }
+    };
+    var circleMaterial = new THREE.ShaderMaterial({
+        uniforms: circleUniforms,
+        attributes: circleAttributes,
+
+        vertexShader: WOsu.Player.circleShader.vertexShader,
+        fragmentShader: WOsu.Player.circleShader.fragmentShader,
+
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+
+    var sliderUniforms = {
+        currentTime: {
+            type: 'f',
+            value: Number.NEGATIVE_INFINITY
+        },
+        approachRate: {
+            type: 'f',
+            value: bmm.AR
+        },
+        overallDifficulty: {
+            type: 'f',
+            value: bmm.OD
+        },
+        circleSize: {
+            type: 'f',
+            value: bmm.CS
+        },
+
+        hitcircle: {
+            type: 't',
+            value: textures.hitcircle
+        },
+        hitcircle_overlay: {
+            type: 't',
+            value: textures.hitcircle_overlay
+        },
+        digits: {
+            type: 'tv',
+            value: [
+                textures.score_0,
+                textures.score_1,
+                textures.score_2,
+                textures.score_3,
+                textures.score_4,
+                textures.score_5,
+                textures.score_6,
+                textures.score_7,
+                textures.score_8,
+                textures.score_9
+            ]
+        }
+    };
+    var sliderAttributes = {
         colorMask: {
             type: 'v4'
         },
@@ -1919,23 +2042,90 @@ WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
             type: 'f'
         },
         center: {
-            type: 'v2'
-        },
-        hitType: {
-            type: 'f'
+            type: 'v3'
         }
     };
-    var hitMaterial = new THREE.ShaderMaterial({
-        uniforms: hitUniforms,
-        attributes: hitAttributes,
+    var sliderMaterial = new THREE.ShaderMaterial({
+        uniforms: sliderUniforms,
+        attributes: sliderAttributes,
 
-        vertexShader: WOsu.Player.hitShader.vertexShader,
-        fragmentShader: WOsu.Player.hitShader.fragmentShader,
+        vertexShader: WOsu.Player.sliderShader.vertexShader,
+        fragmentShader: WOsu.Player.sliderShader.fragmentShader,
 
         side: THREE.DoubleSide,
         transparent: true
     });
+    
+    var sliderBodyUniforms = {
+        currentTime: {
+            type: 'f',
+            value: Number.NEGATIVE_INFINITY
+        },
+        approachRate: {
+            type: 'f',
+            value: bmm.AR
+        },
+        overallDifficulty: {
+            type: 'f',
+            value: bmm.OD
+        },
+        circleSize: {
+            type: 'f',
+            value: bmm.CS
+        },
 
+        hitcircle: {
+            type: 't',
+            value: textures.hitcircle
+        },
+        hitcircle_overlay: {
+            type: 't',
+            value: textures.hitcircle_overlay
+        },
+        digits: {
+            type: 'tv',
+            value: [
+                textures.score_0,
+                textures.score_1,
+                textures.score_2,
+                textures.score_3,
+                textures.score_4,
+                textures.score_5,
+                textures.score_6,
+                textures.score_7,
+                textures.score_8,
+                textures.score_9
+            ]
+        }
+    };
+    var sliderBodyAttributes = {
+        colorMask: {
+            type: 'v4'
+        },
+        startTime: {
+            type: 'f'
+        },
+        endTime: {
+            type: 'f'
+        },
+        hitTime: {
+            type: 'f'
+        },
+        center: {
+            type: 'v3'
+        }
+    };
+    var sliderBodyMaterial = new THREE.ShaderMaterial({
+        uniforms: sliderBodyUniforms,
+        attributes: sliderBodyAttributes,
+
+        vertexShader: WOsu.Player.sliderBodyShader.vertexShader,
+        fragmentShader: WOsu.Player.sliderBodyShader.fragmentShader,
+
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    
     var spinnerUniforms = {
         currentTime: {
             type: 'f',
@@ -1993,17 +2183,32 @@ WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
     var comboNumber = 1;
     var totalObjects = bmo.length;
 
+    // Score indicators
+    var scoreAdd = [];
+    var scoreOffset = 1;
     // Approach circles
     var approachAdd = [];
+    var approachOffset = 2;
     // Hit circles and sliders
     var hitAdd = [];
+    var hitOffset = 3;
     // Spinners
     var spinnerAdd = [];
+    var spinnerOffset = 4;
     // TODO Follow points
 
     var meshes = [];
+    var eventIndex = 0;
     for (var i = 0; i < totalObjects; i++) {
         var hitobj = bmo[i];
+
+        // Associate events with meshes
+        // Everything should be in order
+        while (eventIndex < bme.length && bme[eventIndex].parent.gameObject != hitobj) {
+            eventIndex++;
+        }
+        var currentEvent = bme[eventIndex];
+        var meshList = {};
 
         if (hitobj.isComboChange()) {
             comboColor = (comboColor + 1) % bmm.colors.length;
@@ -2016,100 +2221,159 @@ WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
         comboNumber++;
 
         // TODO Stacked notes offset (probably goes in BeatmapLoader)
-        // Link meshes with corresponding hit objects
         var nextobj;
         if (hitobj.isCircle()) {
+            
+            nextobj = this.createThreeScore({
+                material: scoreMaterial,
+                attributes: scoreAttributes,
+                object: hitobj,
+                z: -i / totalObjects - scoreOffset,
+                mechanics: bmm
+            });
+            nextobj.gameObject = hitobj;
+            
+            scoreAdd.push(nextobj);
+            meshes.push(nextobj);
+            meshList.score = nextobj;
 
             nextobj = this.createThreeApproachCircle({
                 material: approachMaterial,
                 object: hitobj,
-                z: -i / totalObjects - 1,
+                z: -i / totalObjects - approachOffset,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
+
             approachAdd.push(nextobj);
             meshes.push(nextobj);
+            meshList.approach = nextobj;
 
             nextobj = this.createThreeCircle({
-                material: hitMaterial,
+                material: circleMaterial,
                 object: hitobj,
-                z: -i / totalObjects - 2,
+                z: -i / totalObjects - hitOffset,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
+
             hitAdd.push(nextobj);
             meshes.push(nextobj);
+            meshList.circle = nextobj;
 
         }
         else if (hitobj.isSlider()) {
+            
+            nextobj = this.createThreeScore({
+                material: scoreMaterial,
+                attributes: scoreAttributes,
+                object: hitobj,
+                z: -i / totalObjects - scoreOffset,
+                mechanics: bmm
+            });
+            nextobj.gameObject = hitobj;
+            
+            scoreAdd.push(nextobj);
+            meshes.push(nextobj);
+            meshList.score = nextobj;
 
             nextobj = this.createThreeApproachCircle({
                 material: approachMaterial,
                 object: hitobj,
-                z: -i / totalObjects - 1,
+                z: -i / totalObjects - approachOffset,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
+
             approachAdd.push(nextobj);
             meshes.push(nextobj);
+            meshList.approach = nextobj;
 
             nextobj = this.createThreeSliderStart({
-                material: hitMaterial,
+                material: sliderMaterial,
                 object: hitobj,
-                z: -i / totalObjects - 2,
+                z: -i / totalObjects - hitOffset,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
+
             hitAdd.push(nextobj);
             meshes.push(nextobj);
+            meshList.sliderStart = nextobj;
 
             nextobj = this.createThreeSliderEnd({
-                material: hitMaterial,
+                material: sliderMaterial,
                 object: hitobj,
-                z: -(i + 0.3) / totalObjects - 2,
+                z: -(i + 0.3) / totalObjects - hitOffset,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
+
             hitAdd.push(nextobj);
             meshes.push(nextobj);
+            meshList.sliderEnd = nextobj;
 
             nextobj = this.createThreeSliderBody({
-                material: hitMaterial,
+                material: sliderBodyMaterial,
                 object: hitobj,
-                z: -(i + 0.6) / totalObjects - 2,
+                z: -(i + 0.6) / totalObjects - hitOffset,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
+
             hitAdd.push(nextobj);
             meshes.push(nextobj);
+            meshList.sliderBody = nextobj;
 
         }
         else if (hitobj.isSpinner()) {
+            
+            nextobj = this.createThreeScore({
+                material: scoreMaterial,
+                attributes: scoreAttributes,
+                object: hitobj,
+                z: -i / totalObjects - scoreOffset,
+                mechanics: bmm
+            });
+            nextobj.gameObject = hitobj;
+            
+            scoreAdd.push(nextobj);
+            meshes.push(nextobj);
+            meshList.score = nextobj;
 
             nextobj = this.createThreeSpinner({
                 material: spinnerMaterial,
                 attributes: spinnerAttributes,
                 object: hitobj,
-                z: -i / totalObjects - 3, // Spinners go behind other objects
+                z: -i / totalObjects - spinnerOffset,
                 mechanics: bmm
             });
             nextobj.gameObject = hitobj;
+
             spinnerAdd.push(nextobj);
             meshes.push(nextobj);
+            meshList.spinner = nextobj;
 
         }
+        
+        currentEvent.parent.data.meshes = meshList;
     }
 
     // Spinners go behind objects
     for (var i = spinnerAdd.length - 1; i >= 0; i--) {
         gameplay.add(spinnerAdd[i]);
     }
+    // Hit objects
     for (var i = hitAdd.length - 1; i >= 0; i--) {
         gameplay.add(hitAdd[i]);
     }
-    // Approach circles go in front of everything
+    // Approach circles
     for (var i = approachAdd.length - 1; i >= 0; i--) {
         gameplay.add(approachAdd[i]);
+    }
+    // Score indicators
+    for (var i = scoreAdd.length - 1; i >= 0; i--) {
+        gameplay.add(scoreAdd[i]);
     }
 
     // Set all objects to be invisible, except ones within the approach rate at the start
@@ -2138,9 +2402,14 @@ WOsu.Player.prototype.loadThreeGameplay = function (threeResync) {
             objects: meshes,
             objectLength: meshes.length,
             // Materials
-            approachMaterial: approachMaterial,
-            hitMaterial: hitMaterial,
-            spinnerMaterial: spinnerMaterial
+            materials: {
+                approachMaterial: approachMaterial,
+                circleMaterial: circleMaterial,
+                sliderMaterial: sliderMaterial,
+                sliderBodyMaterial: sliderBodyMaterial,
+                spinnerMaterial: spinnerMaterial,
+                scoreMaterial: scoreMaterial
+            }
         }
     };
 
@@ -2276,7 +2545,6 @@ WOsu.Player.cursorShader = {
 
         "void main() {",
         "   float diff = (currentTime - hitTime) / 50.0;",
-        "   vec3 scaledPosition = position;",
         "   float factor = 1.0;",
         // Cursor has been hit (scaling up)
         "   if (isHit == 1) {",
@@ -2286,10 +2554,9 @@ WOsu.Player.cursorShader = {
         "   else {",
         "       factor = 1.0 + (1.0 - clamp(diff, 0.0, 1.0)) * 0.4;",
         "   }",
-        "   scaledPosition.x *= factor;",
-        "   scaledPosition.y *= factor;",
+        "   vec4 scaledPosition = vec4(position.x * factor, position.y * factor, position.z, 1.0);",
         "   vUv = uv;",
-        "   gl_Position = projectionMatrix * modelViewMatrix * vec4(scaledPosition, 1.0);",
+        "   gl_Position = projectionMatrix * modelViewMatrix * scaledPosition;",
         "}"
     ].join("\n"),
 
@@ -2305,17 +2572,249 @@ WOsu.Player.cursorShader = {
 };
 
 /**
-    Shader for hit circles and sliders
+    Shader for digits
 */
-WOsu.Player.hitShader = {
+WOsu.Player.digitShader = {
     vertexShader: [
-        // Some constants
-        "#define EPSILON 0.1",
-        "#define TYPE_CIRCLE 0.0",
-        "#define TYPE_END_CIRCLE 1.0",
-        "#define TYPE_SLIDER_BODY 2.0",
-        "#define TYPE_SLIDER_REPEAT 3.0",
+        
+    ].join("\n"),
+    
+    fragmentShader: [
+        
+    ].join("\n")
+};
 
+/**
+    Shader for score indicators
+*/
+WOsu.Player.scoreShader = {
+    vertexShader: [
+        // The current time of the playback
+        "uniform float currentTime;",
+
+        // Beatmap mechanics to compute size
+        "uniform float approachRate;",
+        "uniform float overallDifficulty;",
+        "uniform float circleSize;",
+
+        // The hit object hit time
+        "attribute float hitTime;",
+        
+        // The score received
+        // -1, 0, 1, 2, 3 - none, miss, 50, 100, 300
+        "attribute float score;",
+
+        // The position of the hit object
+        "attribute vec3 center;",
+
+        // When it's kiai time, flash like crazy
+        // TODO "uniform float kiaiTime;"
+
+        "varying vec2 vUv;",
+        "varying float vAlpha;",
+        "varying float vScore;",
+
+        "void main() {",
+        // Interpolate alpha and size
+        // From hit time to 100 in, hold 300, fade out 400
+        "   float alpha = 0.0;",
+        "   float scale = 1.0;",
+        "   if (currentTime > hitTime && currentTime < hitTime + 400.0) {",
+        "       alpha = clamp((currentTime - hitTime) / 100.0, 0.0, 1.0);",
+        "       scale = 0.5 + 0.5 * (clamp((currentTime - hitTime) / 100.0, 0.0, 1.0));",
+        "   }",
+        "   else if (currentTime > hitTime && currentTime < hitTime + 800.0) {",
+        "       alpha = clamp(1.0 - (currentTime - 400.0 - hitTime) / 400.0, 0.0, 1.0);",
+        "   }",
+        "   vec4 scaledPosition = vec4(scale * position.x + center.x, scale * position.y + center.y, position.z, 1.0);",
+        "   vUv = uv;",
+        "   vAlpha = alpha;",
+        "   vScore = score + 0.5;",
+        "   gl_Position = projectionMatrix * modelViewMatrix * scaledPosition;",
+        "}"
+    ].join("\n"),
+
+    fragmentShader: [
+        "uniform sampler2D hit300;",
+        "uniform sampler2D hit100;",
+        "uniform sampler2D hit50;",
+        "uniform sampler2D hit0;",
+
+        "varying vec2 vUv;",
+        "varying float vAlpha;",
+        "varying float vScore;",
+
+        "void main() {",
+        "   vec4 color = vec4(0.0, 0.0, 0.0, 0.0);",
+        "   if (vScore > 3.0) {",
+        "       color = texture2D(hit300, vUv);",
+        "   }",
+        "   else if (vScore > 2.0) {",
+        "       color = texture2D(hit100, vUv);",
+        "   }",
+        "   else if (vScore > 1.0) {",
+        "       color = texture2D(hit50, vUv);",
+        "   }",
+        "   else if (vScore > 0.0) {",
+        "       color = texture2D(hit0, vUv);",
+        "   }",
+        "   gl_FragColor = color * vAlpha;",
+        "}"
+    ].join("\n")
+};
+
+/**
+    Shader for approach circles
+*/
+WOsu.Player.approachShader = {
+    vertexShader: [
+        // The current time of the playback
+        "uniform float currentTime;",
+
+        // Beatmap mechanics to compute opacity and size
+        "uniform float approachRate;",
+        "uniform float overallDifficulty;",
+        "uniform float circleSize;",
+
+        // The hit object start time
+        "attribute float startTime;",
+
+        // The hit object hit time
+        "attribute float hitTime;",
+
+        // The hit object color
+        "attribute vec4 colorMask;",
+
+        // The position of the hit object
+        "attribute vec3 center;",
+
+        // When it's kiai time, flash like crazy
+        // TODO "uniform float kiaiTime;"
+
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        // Interpolate alpha from approach rate to 50
+        "   vUv = uv;",
+        "   vColor = colorMask;",
+        "   vAlpha = 0.0;",
+        "   float scale = 1.0;",
+        "   if (currentTime < min(startTime, hitTime)) {",
+        "       vAlpha = clamp((approachRate + currentTime - startTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
+        "       scale = 1.0 + 2.0 * (startTime - currentTime) / approachRate;",
+        "   }",
+        // Compute size
+        "   vec4 scaledPosition = vec4(position.x * scale + center.x, position.y * scale + center.y, position.z, 1.0);",
+        "   gl_Position = projectionMatrix * modelViewMatrix * scaledPosition;",
+        "}"
+    ].join("\n"),
+
+    fragmentShader: [
+        "uniform sampler2D approachcircle;",
+
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        "   vec4 tex1 = texture2D(approachcircle, vUv);",
+        "   vec4 color = tex1 * vColor * tex1.a;",
+
+        "   gl_FragColor = color * vAlpha;",
+        "}"
+    ].join("\n")
+};
+
+/**
+    Shader for hit circles
+*/
+WOsu.Player.circleShader = {
+    vertexShader: [
+        // The current time of the playback
+        "uniform float currentTime;",
+
+        // Beatmap mechanics
+        "uniform float approachRate;",
+        "uniform float overallDifficulty;",
+        "uniform float circleSize;",
+
+        // The hit circle color
+        "attribute vec4 colorMask;",
+
+        // The hit circle time
+        "attribute float startTime;",
+
+        // When the beat was hit (otherwise positive infinity)
+        "attribute float hitTime;",
+
+        // TODO Cause the beat to shake a bit if early
+
+        // TODO When it's kiai time, flash like crazy
+        // uniform float kiaiTime;
+
+        // Center of the hit object
+        "attribute vec3 center;",
+
+        // TODO Combo number
+        // "varying int? combo;"
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        "   vColor = colorMask;",
+        "   vUv = uv;",
+        "   float scale = 1.0;",
+        // If the circle has been hit, fade out
+        // Fade for 200 milliseconds, expand up to 1.5x
+        "   if (currentTime > hitTime && currentTime < hitTime + 200.0) {",
+        "       vAlpha = 1.0 - (currentTime - hitTime) / 200.0;",
+        "       scale = 1.0 + (currentTime - hitTime) / 200.0 * 0.5;",
+        "   }",
+        // If it is before the approach rate
+        // or past the overall difficulty time, make invisible
+        "   else if (currentTime < startTime - approachRate || currentTime > startTime + overallDifficulty) {",
+        "       vAlpha = 0.0;",
+        "       scale = 0.0;",
+        "   }",
+        // Interpolate alpha from approach rate to overall difficulty
+        "   else {",
+        "       vAlpha = clamp((approachRate + currentTime - startTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
+        "   }",
+        "   vec4 scaledPosition = vec4(scale * position.x + center.x, scale * position.y + center.y, position.z, 1.0);",
+        "   gl_Position = projectionMatrix * modelViewMatrix * scaledPosition;",
+        "}"
+    ].join("\n"),
+
+    fragmentShader: [
+        "uniform sampler2D hitcircle;",
+        "uniform sampler2D hitcircle_overlay;",
+        "uniform sampler2D digits[10];",
+
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        "   vec4 color = vec4(0, 0, 0, 0);",
+        "   vec4 tex1, tex2;",
+        // Draw a circle
+        "   tex1 = texture2D(hitcircle, vUv);",
+        "   color = tex1 * vColor * tex1.a;",
+        "   tex2 = texture2D(hitcircle_overlay, vUv);",
+        "   color = mix(color, tex2, tex2.a);",
+        "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, clamp(vAlpha, 0.0, 1.0));",
+        "}"
+    ].join("\n")
+};
+
+/**
+    Shader for slider endpoints
+*/
+WOsu.Player.sliderShader = {
+    vertexShader: [
         // The current time of the playback
         "uniform float currentTime;",
 
@@ -2335,104 +2834,149 @@ WOsu.Player.hitShader = {
 
         // When the beat was hit (otherwise positive infinity)
         "attribute float hitTime;",
-
-        // When the beat was hit (but before OD threshold)
-        // Cause the beat to shake a bit
-        // TODO "uniform float earlyTime;"
+        
+        // TODO Number of repeats
+        //"attribute int repeats;",
 
         // When it's kiai time, flash like crazy
         // TODO "uniform float kiaiTime;"
 
         // Center of the hit object
-        "attribute vec2 center;",
-
-        // Hit object type
-        // 0 = Numbered hit circle
-        // 1 = End circle
-        // 2 = Slider body
-        // 3 = Repeat
-        "attribute float hitType;",
+        "attribute vec3 center;",
 
         // TODO Combo number
         // "varying int? combo;"
-        "varying vec3 vPosition;",
         "varying vec2 vUv;",
         "varying vec4 vColor;",
         "varying float vAlpha;",
-        "varying float vType;",
 
         "void main() {",
-        // If the circle is before the approach rate
-        // Or after the overall difficulty threshold
-        // Or the hit object is a circle and has already been hit
-        "   if (currentTime - startTime < -approachRate || currentTime - endTime > overallDifficulty || (abs(hitType - TYPE_CIRCLE) < EPSILON && currentTime > hitTime)) {",
-        // Draw a degenerate triangle behind the camera
-        "       gl_Position = vec4(0.0, 0.0, -2.0, 1.0);",
+        "   vColor = colorMask;",
+        "   vUv = uv;",
+        "   float scale = 1.0;",
+        // If the circle has been hit, fade out
+        // Fade for 250 milliseconds, expand up to 1.4x
+        "   if (currentTime > hitTime && currentTime < hitTime + 250.0) {",
+        "       vAlpha = 1.0 - (currentTime - hitTime) / 250.0;",
+        "       scale = 1.0 + (currentTime - hitTime) / 250.0 * 0.4;",
         "   }",
+        // If it is before the approach rate
+        // or past the overall difficulty time, make invisible
+        "   else if (currentTime < startTime - approachRate || currentTime > endTime) {",
+        "       vAlpha = 0.0;",
+        "       scale = 0.0;",
+        "   }",
+        // Interpolate alpha from approach rate to overall difficulty
         "   else {",
-        // Interpolate alpha from approach rate to 50
-        "       float alpha = clamp((approachRate + currentTime - startTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
-        "       vColor = colorMask;",
-        "       vAlpha = alpha;",
-        // Pass all other variables
-        "       vPosition = position;",
-        "       vUv = uv;",
-        "       vType = hitType;",
-        "       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "       vAlpha = clamp((approachRate + currentTime - startTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
         "   }",
+        "   vec4 scaledPosition = vec4(scale * position.x + center.x, scale * position.y + center.y, position.z, 1.0);",
+        "   gl_Position = projectionMatrix * modelViewMatrix * scaledPosition;",
         "}"
     ].join("\n"),
 
     fragmentShader: [
-        // Some constants
-        "#define EPSILON 0.1",
-        "#define TYPE_CIRCLE 0.0",
-        "#define TYPE_END_CIRCLE 1.0",
-        "#define TYPE_SLIDER_BODY 2.0",
-        "#define TYPE_SLIDER_REPEAT 3.0",
-
         "uniform sampler2D hitcircle;",
         "uniform sampler2D hitcircle_overlay;",
         "uniform sampler2D digits[10];",
 
-        "varying vec3 vPosition;",
         "varying vec2 vUv;",
         "varying vec4 vColor;",
         "varying float vAlpha;",
-        "varying float vType;",
 
         "void main() {",
         "   vec4 color = vec4(0, 0, 0, 0);",
         "   vec4 tex1, tex2;",
         // Draw a circle
-        "   if (abs(vType - TYPE_CIRCLE) < EPSILON) {",
-        "       tex1 = texture2D(hitcircle, vUv);",
-        "       color = tex1 * vColor * tex1.a;",
-        "       tex2 = texture2D(hitcircle_overlay, vUv);",
-        "       color = mix(color, tex2, tex2.a);",
-        // TODO Draw digits
+        "   tex1 = texture2D(hitcircle, vUv);",
+        "   color = tex1 * vColor * tex1.a;",
+        "   tex2 = texture2D(hitcircle_overlay, vUv);",
+        "   color = mix(color, tex2, tex2.a);",
+        "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, clamp(vAlpha, 0.0, 1.0));",
+        "}"
+    ].join("\n")
+};
+
+/**
+    Shader for slider bodies
+*/
+WOsu.Player.sliderBodyShader = {
+    vertexShader: [
+        // The current time of the playback
+        "uniform float currentTime;",
+
+        // Beatmap mechanics
+        "uniform float approachRate;",
+        "uniform float overallDifficulty;",
+        "uniform float circleSize;",
+
+        // The hit object color
+        "attribute vec4 colorMask;",
+
+        // The hit object start time
+        "attribute float startTime;",
+
+        // The hit object end time
+        "attribute float endTime;",
+
+        // When the beat was hit (otherwise positive infinity)
+        "attribute float hitTime;",
+        
+        // TODO Number of repeats
+        //"attribute int repeats;",
+
+        // When it's kiai time, flash like crazy
+        // TODO "uniform float kiaiTime;"
+
+        // Center of the hit object
+        "attribute vec3 center;",
+
+        // TODO Combo number
+        // "varying int? combo;"
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        "   vColor = colorMask;",
+        "   vUv = uv;",
+        // If the circle has been hit, fade out
+        // Fade for 200 milliseconds
+        "   if (currentTime > hitTime && currentTime < hitTime + 200.0) {",
+        "       vAlpha = 1.0 - (currentTime - hitTime) / 200.0;",
         "   }",
-        // Draw an end circle
-        "   else if (abs(vType - TYPE_END_CIRCLE) < EPSILON) {",
-        "       tex1 = texture2D(hitcircle, vUv);",
-        "       color = tex1 * vColor * tex1.a;",
-        "       tex2 = texture2D(hitcircle_overlay, vUv);",
-        "       color = mix(color, tex2, tex2.a);",
+        // If it is before the approach rate
+        // or past the overall difficulty time, make invisible
+        "   else if (currentTime < startTime - approachRate || currentTime > endTime) {",
+        "       vAlpha = 0.0;",
         "   }",
-        // Draw the slider body
-        "   else if (abs(vType - TYPE_SLIDER_BODY) < EPSILON) {",
-        "       tex1 = texture2D(hitcircle, vUv);",
-        "       color = tex1 * vColor * tex1.a;",
-        "       tex2 = texture2D(hitcircle_overlay, vUv);",
-        "       color = mix(color, tex2, tex2.a);",
+        // Interpolate alpha from approach rate to overall difficulty
+        "   else {",
+        "       vAlpha = clamp((approachRate + currentTime - startTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
         "   }",
-        // Draw the slider repeat
-        "   else if (abs(vType - TYPE_SLIDER_REPEAT) < EPSILON) {",
-        "       //tex1 = texture2D(slider_repeat, vUv);",
-        "       color = tex1 * tex1.a;",
-        "   }",
-        // TODO Draw the slider ball
-        "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, clamp(vAlpha + 0.5, 0.0, 1.0));",
+        "   vec4 scaledPosition = vec4(position.x, position.y, position.z, 1.0);",
+        "   gl_Position = projectionMatrix * modelViewMatrix * scaledPosition;",
+        "}"
+    ].join("\n"),
+    
+    fragmentShader: [
+        "uniform sampler2D hitcircle;",
+        "uniform sampler2D hitcircle_overlay;",
+        "uniform sampler2D digits[10];",
+
+        "varying vec2 vUv;",
+        "varying vec4 vColor;",
+        "varying float vAlpha;",
+
+        "void main() {",
+        "   vec4 color = vec4(0, 0, 0, 0);",
+        "   vec4 tex1, tex2;",
+        // Draw a circle
+        "   tex1 = texture2D(hitcircle, vUv);",
+        "   color = tex1 * vColor * tex1.a;",
+        "   tex2 = texture2D(hitcircle_overlay, vUv);",
+        "   color = mix(color, tex2, tex2.a);",
+        "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, clamp(vAlpha, 0.0, 1.0));",
         "}"
     ].join("\n")
 };
@@ -2463,29 +3007,22 @@ WOsu.Player.spinnerShader = {
         // TODO "uniform float kiaiTime;"
 
         // TODO Spinner speed
-        // "varying int? digit;"
         "varying vec2 vUv;",
         "varying vec4 vColor;",
         "varying float vAlpha;",
         "varying float vScale;",
 
         "void main() {",
-        // If the spinner is before the approach rate
-        // Or after the end time
-        "   if (currentTime < startTime - approachRate || currentTime > endTime) {",
-        // Draw a degenerate triangle behind the camera
-        "       gl_Position = vec4(0, 0, -2, 1);",
+        "   float alpha = 0.0;",
+        "   if (currentTime < endTime) {",
+        "       alpha = clamp((approachRate + currentTime - startTime) / (approachRate), 0.0, 1.0);",
         "   }",
-        "   else {",
-        "       float alpha = clamp((approachRate + currentTime - startTime) / (approachRate), 0.0, 1.0);",
         // Interpolate scale from start time to end time
-        "       vScale = clamp((endTime - currentTime) / (endTime - startTime), 0.0, 1.0);",
+        "   vScale = clamp((endTime - currentTime) / (endTime - startTime), 0.0, 1.0);",
         // Interpolate alpha from approach rate to start time
-        "       vAlpha = alpha;",
-        "       vColor = vec4(1.0, 1.0, 1.0, 1.0);",
-        "       vUv = uv;",
-        "       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
-        "   }",
+        "   vAlpha = alpha;",
+        "   vUv = uv;",
+        "   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
         "}"
     ].join("\n"),
 
@@ -2495,17 +3032,16 @@ WOsu.Player.spinnerShader = {
         "uniform sampler2D spinner_background;",
 
         "varying vec2 vUv;",
-        "varying vec4 vColor;",
         "varying float vAlpha;",
         "varying float vScale;",
 
         "void main() {",
-        "   vec4 color = vec4(0, 0, 0, 0);",
         "   vec4 tex = texture2D(spinner_background, vUv);",
-        "   color = tex * vColor * tex.a;",
+        "   vec4 color = tex * tex.a;",
 
         // Spinner circle is square-ish
         // 512 x 384 -> 384 x 384
+        // TODO Rotate by the spin ammount
         "   vec2 nuv = vec2(vUv.x * 4.0 / 3.0 - 1.0 / 6.0, vUv.y);",
         "   tex = texture2D(spinner_circle, nuv);",
         "   color = mix(color, tex, tex.a);",
@@ -2519,78 +3055,6 @@ WOsu.Player.spinnerShader = {
         "   }",
 
         "   gl_FragColor = color * vec4(1.0, 1.0, 1.0, vAlpha);",
-        "}"
-    ].join("\n")
-};
-
-/**
-    Shader for approach circles
-*/
-WOsu.Player.approachShader = {
-    vertexShader: [
-        // The current time of the playback
-        "uniform float currentTime;",
-
-        // Beatmap mechanics to compute opacity and size
-        "uniform float approachRate;",
-        "uniform float overallDifficulty;",
-        "uniform float circleSize;",
-
-        // The hit object start time
-        "attribute float startTime;",
-
-        // The hit object hit time
-        "attribute float hitTime;",
-
-        // The hit object color
-        "attribute vec4 colorMask;",
-
-        // The position of the hit object
-        "attribute vec2 center;",
-
-        // When it's kiai time, flash like crazy
-        // TODO "uniform float kiaiTime;"
-
-        "varying vec2 vUv;",
-        "varying vec4 vColor;",
-        "varying float vAlpha;",
-
-        "void main() {",
-        // If the approach circle is before the approach rate
-        // Or after the object time or hit time
-        "   if (currentTime - startTime < -approachRate || currentTime > startTime || currentTime > hitTime) {",
-        // Draw a degenerate triangle behind the camera
-        "       gl_Position = vec4(0, 0, -2, 1);",
-        "   }",
-        "   else {",
-        // Interpolate alpha from approach rate to 50
-        "       float alpha = clamp((approachRate + currentTime - startTime) / (approachRate - overallDifficulty), 0.0, 1.0);",
-        // Compute size
-        "       vec3 scaledPosition = position;",
-        "       float scale = 1.0 + 2.0 * (startTime - currentTime) / approachRate;",
-        "       scaledPosition.x = scaledPosition.x * scale + center.x;",
-        "       scaledPosition.y = scaledPosition.y * scale + center.y;",
-        "       vColor = colorMask;",
-        "       vAlpha = alpha;",
-        "       vUv = uv;",
-        "       gl_Position = projectionMatrix * modelViewMatrix * vec4(scaledPosition, 1.0);",
-        "   }",
-        "}"
-    ].join("\n"),
-
-    // FUTURE Handle sliders as osu does, built-in without textures (?)
-    fragmentShader: [
-        "uniform sampler2D approachcircle;",
-
-        "varying vec2 vUv;",
-        "varying vec4 vColor;",
-        "varying float vAlpha;",
-
-        "void main() {",
-        "   vec4 tex1 = texture2D(approachcircle, vUv);",
-        "   vec4 color = tex1 * vColor * tex1.a;",
-
-        "   gl_FragColor = color * vAlpha;",
         "}"
     ].join("\n")
 };
@@ -2697,6 +3161,60 @@ WOsu.Player.prototype.createThreeCursor = function (params) {
     return mesh;
 }
 
+WOsu.Player.prototype.createThreeScore = function(params) {
+    var obj = params.object;
+    var x = (obj.isSlider() ? obj.endX : obj.x) - 256;
+    var y = 192 - (obj.isSlider() ? obj.endY : obj.y);
+    var z = params.z;
+    var s = params.mechanics.CS * 2.0;
+    var colors = params.mechanics.colors;
+    var r = colors[obj.combo][0] / 255.0;
+    var g = colors[obj.combo][1] / 255.0;
+    var b = colors[obj.combo][2] / 255.0;
+
+    var geometry = new THREE.BufferGeometry();
+
+    var positions = [
+        -s, -s, z,
+        -s, +s, z,
+        +s, +s, z,
+
+        -s, -s, z,
+        +s, +s, z,
+        +s, -s, z
+    ];
+
+    var uvs = [
+        0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+        0.0, 0.0, 1.0, 1.0, 1.0, 0.0
+    ];
+
+    var hitTimes = [
+        Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY,
+        Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY
+    ];
+
+    var scores = [
+        -1, -1, -1,
+        -1, -1, -1
+    ];
+
+    var centers = [
+        x, y, 0, x, y, 0, x, y, 0,
+        x, y, 0, x, y, 0, x, y, 0
+    ];
+
+    geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.addAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
+    geometry.addAttribute("score", new THREE.BufferAttribute(new Int32Array(scores), 1));
+    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 3));
+
+    var mesh = new THREE.Mesh(geometry, params.material);
+
+    return mesh;
+}
+
 WOsu.Player.prototype.createThreeApproachCircle = function (params) {
     var obj = params.object;
     var x = obj.x - 256;
@@ -2710,12 +3228,14 @@ WOsu.Player.prototype.createThreeApproachCircle = function (params) {
 
     var geometry = new THREE.BufferGeometry();
 
-    var positions = [-s, -s, z, -s, s, z,
-        s, s, z,
+    var positions = [
+        -s, -s, z,
+        -s, +s, z,
+        +s, +s, z,
 
         -s, -s, z,
-        s, s, z,
-        s, -s, z
+        +s, +s, z,
+        +s, -s, z
     ];
 
     var uvs = [
@@ -2739,8 +3259,8 @@ WOsu.Player.prototype.createThreeApproachCircle = function (params) {
     ];
 
     var centers = [
-        x, y, x, y, x, y,
-        x, y, x, y, x, y
+        x, y, 0, x, y, 0, x, y, 0,
+        x, y, 0, x, y, 0, x, y, 0
     ];
 
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
@@ -2748,7 +3268,7 @@ WOsu.Player.prototype.createThreeApproachCircle = function (params) {
     geometry.addAttribute("colorMask", new THREE.BufferAttribute(new Float32Array(colors), 4));
     geometry.addAttribute("startTime", new THREE.BufferAttribute(new Float32Array(startTimes), 1));
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
-    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
+    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 3));
 
     var mesh = new THREE.Mesh(geometry, params.material);
 
@@ -2769,13 +3289,13 @@ WOsu.Player.prototype.createThreeCircle = function (params) {
     var geometry = new THREE.BufferGeometry();
 
     var positions = [
-        x - s, y - s, z,
-        x - s, y + s, z,
-        x + s, y + s, z,
+        -s, -s, z,
+        -s, +s, z,
+        +s, +s, z,
 
-        x - s, y - s, z,
-        x + s, y + s, z,
-        x + s, y - s, z
+        -s, -s, z,
+        +s, +s, z,
+        +s, -s, z
     ];
 
     var uvs = [
@@ -2804,13 +3324,8 @@ WOsu.Player.prototype.createThreeCircle = function (params) {
     ];
 
     var centers = [
-        x, y, x, y, x, y,
-        x, y, x, y, x, y
-    ];
-
-    var hitTypes = [
-        0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0
+        x, y, 0, x, y, 0, x, y, 0,
+        x, y, 0, x, y, 0, x, y, 0
     ];
 
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
@@ -2819,9 +3334,8 @@ WOsu.Player.prototype.createThreeCircle = function (params) {
     geometry.addAttribute("startTime", new THREE.BufferAttribute(new Float32Array(startTimes), 1));
     geometry.addAttribute("endTime", new THREE.BufferAttribute(new Float32Array(endTimes), 1));
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
-    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
-    geometry.addAttribute("hitType", new THREE.BufferAttribute(new Float32Array(hitTypes), 1));
-
+    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 3));
+    
     var mesh = new THREE.Mesh(geometry, params.material);
 
     return mesh;
@@ -2841,13 +3355,13 @@ WOsu.Player.prototype.createThreeSliderStart = function (params) {
     var geometry = new THREE.BufferGeometry();
 
     var positions = [
-        x - s, y - s, z,
-        x - s, y + s, z,
-        x + s, y + s, z,
+        -s, -s, z,
+        -s, +s, z,
+        +s, +s, z,
 
-        x - s, y - s, z,
-        x + s, y + s, z,
-        x + s, y - s, z
+        -s, -s, z,
+        +s, +s, z,
+        +s, -s, z
     ];
 
     var uvs = [
@@ -2876,13 +3390,8 @@ WOsu.Player.prototype.createThreeSliderStart = function (params) {
     ];
 
     var centers = [
-        x, y, x, y, x, y,
-        x, y, x, y, x, y
-    ];
-
-    var hitTypes = [
-        0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0
+        x, y, 0, x, y, 0, x, y, 0,
+        x, y, 0, x, y, 0, x, y, 0
     ];
 
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
@@ -2891,9 +3400,8 @@ WOsu.Player.prototype.createThreeSliderStart = function (params) {
     geometry.addAttribute("startTime", new THREE.BufferAttribute(new Float32Array(startTimes), 1));
     geometry.addAttribute("endTime", new THREE.BufferAttribute(new Float32Array(endTimes), 1));
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
-    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
-    geometry.addAttribute("hitType", new THREE.BufferAttribute(new Float32Array(hitTypes), 1));
-
+    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 3));
+    
     var mesh = new THREE.Mesh(geometry, params.material);
 
     return mesh;
@@ -2913,13 +3421,13 @@ WOsu.Player.prototype.createThreeSliderEnd = function (params) {
     var geometry = new THREE.BufferGeometry();
 
     var positions = [
-        x - s, y - s, z,
-        x - s, y + s, z,
-        x + s, y + s, z,
+        -s, -s, z,
+        -s, +s, z,
+        +s, +s, z,
 
-        x - s, y - s, z,
-        x + s, y + s, z,
-        x + s, y - s, z
+        -s, -s, z,
+        +s, +s, z,
+        +s, -s, z
     ];
 
     var uvs = [
@@ -2948,13 +3456,8 @@ WOsu.Player.prototype.createThreeSliderEnd = function (params) {
     ];
 
     var centers = [
-        x, y, x, y, x, y,
-        x, y, x, y, x, y
-    ];
-
-    var hitTypes = [
-        1.0, 1.0, 1.0,
-        1.0, 1.0, 1.0
+        x, y, 0, x, y, 0, x, y, 0,
+        x, y, 0, x, y, 0, x, y, 0
     ];
 
     geometry.addAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
@@ -2963,8 +3466,7 @@ WOsu.Player.prototype.createThreeSliderEnd = function (params) {
     geometry.addAttribute("startTime", new THREE.BufferAttribute(new Float32Array(startTimes), 1));
     geometry.addAttribute("endTime", new THREE.BufferAttribute(new Float32Array(endTimes), 1));
     geometry.addAttribute("hitTime", new THREE.BufferAttribute(new Float32Array(hitTimes), 1));
-    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 2));
-    geometry.addAttribute("hitType", new THREE.BufferAttribute(new Float32Array(hitTypes), 1));
+    geometry.addAttribute("center", new THREE.BufferAttribute(new Float32Array(centers), 3));
 
     var mesh = new THREE.Mesh(geometry, params.material);
 
@@ -3171,9 +3673,6 @@ WOsu.Player.prototype.play = function () {
 
 WOsu.Player.prototype.frame = function () {
     var instance = this;
-    requestAnimationFrame(function () {
-        instance.frame();
-    });
 
     if (this.playing) {
         var time = this.audio.currentTime * 1000;
@@ -3187,15 +3686,22 @@ WOsu.Player.prototype.frame = function () {
         this.frame_game(time);
     }
 
+    // Debug data
+    this.frame_debug(time);
+
     var renderer = this.three.renderer;
     renderer.render(this.three.scene, this.three.camera);
+
+    requestAnimationFrame(function () {
+        instance.frame();
+    });
 }
 
 WOsu.Player.prototype.frame_game = function (time) {
     var game = this.three.layers.gameplay.properties;
 
     // Show / hide approaching objects
-    var threshold = this.beatmap.BeatmapMechanics.AR * 2;
+    var threshold = this.game.mechanics.AR * 2;
     var mesh;
     // Show
     while (game.objectEnd < game.objectLength && (mesh = game.objects[game.objectEnd]).gameObject.time < time + threshold) {
@@ -3209,27 +3715,24 @@ WOsu.Player.prototype.frame_game = function (time) {
     }
 
     // Set gameplay uniforms
-    var uniforms;
-    uniforms = game.hitMaterial.uniforms;
-    uniforms.currentTime.value = time;
-    uniforms = game.spinnerMaterial.uniforms;
-    uniforms.currentTime.value = time;
-    uniforms = game.approachMaterial.uniforms;
-    uniforms.currentTime.value = time;
+    for (var i in game.materials) {
+        game.materials[i].uniforms.currentTime.value = time;
+    }
 
     // TODO Handler follow points
     // TODO Handle sliders and spinners as well
     // TODO Handle slider balls (but not slider ball circle!)
 }
 
+// TODO Abstract scoring parts of the replay
 WOsu.Player.prototype.frame_replay = function (time) {
-    var bmm = this.beatmap.BeatmapMechanics;
     var replay = this.three.layers.replay.properties;
     var data = this.replay.replayData;
     var game = this.game;
     var index = this.game.index;
     var score = this.game.score;
-    var events = this.beatmap.BeatmapMechanics.events;
+    var bmm = this.game.mechanics;
+    var events = this.game.events;
 
     while (index.replayIndex < index.replayLength) {
         var currReplay = data[index.replayIndex];
@@ -3256,6 +3759,14 @@ WOsu.Player.prototype.frame_replay = function (time) {
                     score.recordBreak();
                     console.log("Circle miss " + event.time);
                     pass = true;
+                    
+                    var meshes = event.parent.data.meshes;
+                    var times = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(currReplay.time, 6)), 1);
+                    var scores = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(0, 6)), 1);
+                    meshes.score.geometry.addAttribute("hitTime", times);
+                    meshes.score.geometry.addAttribute("score", scores);
+                    meshes.approach.geometry.addAttribute("hitTime", times);
+                    meshes.circle.geometry.addAttribute("hitTime", times);
                 }
 
             }
@@ -3274,44 +3785,59 @@ WOsu.Player.prototype.frame_replay = function (time) {
             else if (event.isType(WOsu.GameEvent.TYPE_SLIDER_END)) {
 
                 if (timeDiff > 0) {
+                    var hitScore = -1;
                     if (event.parent.data.hold) {
                         event.parent.data.hit++;
                         // Compute score
+                        score.record30();
+                        score.recordCombo();
                         if (event.parent.data.hit == event.parent.data.total) {
                             // All ticks hit
                             score.record300();
+                            hitScore = 3;
                         }
                         else if (event.parent.data.hit * 2 >= event.parent.data.total) {
                             // At least half ticks hit
                             score.record100();
+                            hitScore = 2;
                         }
                         else {
                             // At least one hit
                             score.record50();
+                            hitScore = 1;
                         }
-                        pass = true;
-                        console.log("1 " + event.parent.data.hit + " " + event.parent.data.total);
-
-                        score.recordCombo();
+                        console.log(event.time + " " + score.currentCombo + " " + "Slider hit");
                     }
                     else {
                         if (event.parent.data.hit * 2 >= event.parent.data.total) {
                             // At least half ticks hit
                             score.record100();
+                            hitScore = 2;
                         }
                         else if (event.parent.data.hit > 0) {
                             // At least one hit
                             score.record50();
+                            hitScore = 1;
                         }
                         else {
                             // Completely missed
                             score.record0();
+                            hitScore = 0;
                         }
-                        pass = true;
-                        console.log("2 " + event.parent.data.hit + " " + event.parent.data.total);
+                        console.log(event.time + " " + score.currentCombo + " " + "Slider end missed");
                     }
+                    pass = true;
                     // Remove from the current list of sliders
                     game.currentSliders.splice(game.currentSliders.indexOf(event.parent), 1);
+
+                    var meshes = event.parent.data.meshes;
+                    var times = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(currReplay.time, 6)), 1);
+                    var scores = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(hitScore, 6)), 1);
+                    meshes.score.geometry.addAttribute("hitTime", times);
+                    meshes.score.geometry.addAttribute("score", scores);
+                    meshes.approach.geometry.addAttribute("hitTime", times);
+                    meshes.sliderStart.geometry.addAttribute("hitTime", times);
+                    meshes.sliderEnd.geometry.addAttribute("hitTime", times);
                 }
 
             }
@@ -3340,13 +3866,68 @@ WOsu.Player.prototype.frame_replay = function (time) {
 
             }
             else if (event.isType(WOsu.GameEvent.TYPE_SPINNER_START)) {
-                pass = true;
+
+                if (timeDiff > 0) {
+                    pass = true;
+                    // Add to the current list of spinners
+                    game.currentSpinners.push(event.parent);
+                }
+
             }
             else if (event.isType(WOsu.GameEvent.TYPE_SPINNER_END)) {
-                // TODO Spinner end
-                score.record300();
-                score.recordCombo();
-                pass = true;
+
+                if (timeDiff > 0) {
+                    // TODO Spinner end score
+                    var spins = event.parent.data.spins;
+                    var needed = event.parent.data.clear * bmm.spin;
+                    var extra = spins - needed;
+                    var hitScore = -1;
+                    console.log(spins + " " + needed);
+                    if (spins >= needed) {
+                        // Completely cleared
+                        score.record300();
+                        score.recordSpin(~~(needed + 2 * extra));
+                        score.recordBonus(~~(extra));
+                        score.recordCombo();
+                        
+                        hitScore = 3;
+                    }
+                    else if (spins >= needed - 0.5) {
+                        // Almost cleared
+                        score.record100();
+                        score.recordSpin(~~spins);
+                        score.recordCombo();
+                        
+                        hitScore = 2;
+                    }
+                    else if (spins >= needed - 1.0) {
+                        // Barely cleared
+                        score.record50();
+                        score.recordSpin(~~spins);
+                        score.recordCombo();
+                        
+                        hitScore = 1
+                    }
+                    else {
+                        // Did not clear
+                        score.record0();
+                        score.recordSpin(~~spins);
+                        score.recordBreak();
+                        
+                        hitScore = 0;
+                    }
+                    pass = true;
+                    // Remove from the current list of sliders
+                    game.currentSpinners.splice(game.currentSpinners.indexOf(event.parent), 1);
+
+                    var meshes = event.parent.data.meshes;
+                    var times = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(currReplay.time, 6)), 1);
+                    var scores = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(hitScore, 6)), 1);
+                    meshes.score.geometry.addAttribute("hitTime", times);
+                    meshes.score.geometry.addAttribute("score", scores);
+                    meshes.spinner.geometry.addAttribute("hitTime", times);
+                }
+
             }
             else {
                 pass = true;
@@ -3358,43 +3939,57 @@ WOsu.Player.prototype.frame_replay = function (time) {
         }
 
         // Check for edges (circles and slider starts)
-        // TODO NOW Check for distance
         if (index.eventIndex < index.eventLength && keyPress && index.replayEdge <= index.replayIndex) { // Rising edge
 
             var event = events[index.eventIndex];
             var timeDiff = Math.abs(event.time - currReplay.time);
             var distDiff = Math.sqrt((currReplay.x - event.x) * (currReplay.x - event.x) + (currReplay.y - event.y) * (currReplay.y - event.y));
             if (event.isType(WOsu.GameEvent.TYPE_CIRCLE) && distDiff <= bmm.CS) {
-                
+
+                var hitScore = -1;
                 if (timeDiff < bmm.hit300) {
                     score.record300();
                     score.recordCombo();
                     index.eventIndex++;
+                    
+                    hitScore = 3;
                 }
                 else if (timeDiff < bmm.hit100) {
                     score.record100();
                     score.recordCombo();
                     index.eventIndex++;
+                    
+                    hitScore = 2;
                 }
                 else if (timeDiff < bmm.hit50) {
                     score.record50();
                     score.recordCombo();
                     index.eventIndex++;
+                    
+                    hitScore = 1;
                 }
                 else {
                     // TODO Circles miss if too early (?)
                 }
-                
+                console.log(event.time + " " + score.currentCombo + " " + "Circle hit");
+
                 event.data.finish = true;
 
-                // TODO Modify hitTime attribute
-                
+                var meshes = event.parent.data.meshes;
+                var times = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(currReplay.time, 6)), 1);
+                var scores = new THREE.BufferAttribute(new Float32Array(WOsu.repeat(hitScore, 6)), 1);
+                meshes.score.geometry.addAttribute("hitTime", times);
+                meshes.score.geometry.addAttribute("score", scores);
+                meshes.approach.geometry.addAttribute("hitTime", times);
+                meshes.circle.geometry.addAttribute("hitTime", times);
+
             }
             else if (event.isType(WOsu.GameEvent.TYPE_SLIDER_START) && distDiff <= bmm.CS) {
 
                 if (timeDiff < bmm.OD) {
                     event.parent.data.hit++;
                     event.parent.data.hold = true;
+                    score.record30();
                     score.recordCombo();
                     index.eventIndex++;
                 }
@@ -3430,7 +4025,6 @@ WOsu.Player.prototype.frame_replay = function (time) {
             if (slider.data.hold) {
                 if (keyRelease || distance > 2 * bmm.CS) {
                     slider.data.hold = false;
-                    console.log(keyRelease + " " + distance);
                 }
             }
             else {
@@ -3442,12 +4036,31 @@ WOsu.Player.prototype.frame_replay = function (time) {
         if (game.currentSpinners.length > 0) {
             var spinner = game.currentSpinners[0];
             if (keyDown && keyStillDown) {
-                // TODO Spinner spinning
-                var lastAngle = Math.atan2(lastReplay.y, lastReplay.x);
-                var currAngle = Math.atan2(currReplay.y, currReplay.x);
+                // Compute spin amount
+                var lastAngle = Math.atan2(192 - lastReplay.y, lastReplay.x - 256);
+                var currAngle = Math.atan2(192 - currReplay.y, currReplay.x - 256);
                 var diff = (Math.abs(lastAngle - currAngle) / (2.0 * Math.PI)) % 1.0;
                 diff = (diff > 0.5) ? 1.0 - diff : diff;
-                spinner.parent.data.spins += diff;
+
+                // Add weighted difference to samples
+                var dt = currReplay.time - lastReplay.time;
+                var samples = spinner.data.samples;
+
+                samples.push([currReplay.time, diff * dt]);
+                spinner.data.sampleTotal += diff * dt;
+
+                // Restrict sampling to 1 seconds (?) unmeasured
+                while (samples.length > 0 && currReplay.time - samples[0][0] > 1000) {
+                    spinner.data.sampleTotal -= samples[0][1];
+                    samples.shift();
+                }
+                var spins = spinner.data.sampleTotal / 1000;
+                // Limit to 477 spins per minute (?)
+                speed = 60000.0 * spins / dt;
+                if (speed > 477) {
+                    spins = 477 * dt / 60000.0;
+                }
+                spinner.data.spins += spins;
             }
         }
 
@@ -3484,6 +4097,122 @@ WOsu.Player.prototype.frame_storyboard = function (time) {
     // TODO Storyboard
 }
 
+WOsu.Player.prototype.frame_debug = function (time) {
+    var debug = this.elements.debug;
+    debug.clear();
+
+    debug.write("Time: " + time.toFixed(0) + "\n");
+    debug.write("\n");
+
+    var score = this.game.score;
+    debug.write("Score:    " + score.totalScore + "\n");
+    debug.write("Accuracy: " + (score.getAccuracy() * 100).toFixed(2) + "%\n");
+    debug.write("Combo:    " + score.currentCombo + "\n");
+    debug.write("\n");
+
+    var cursor = this.replay.replayData[this.game.index.replayIndex];
+    debug.write("Cursor X: " + cursor.x.toFixed(0) + "\n");
+    debug.write("Cursor Y: " + cursor.y.toFixed(0) + "\n");
+    var k1 = ((cursor.keys % 2) > 0);
+    var k2 = ((cursor.keys % 4) > 1);
+    debug.write("Keys: ");
+    debug.write((k1 ? "<u>" : "") + "K1" + (k1 ? "</u>" : "") + " ");
+    debug.write((k2 ? "<u>" : "") + "K2" + (k2 ? "</u>" : "") + " ");
+    debug.write("\n");
+
+    debug.update();
+}
+
+/**
+    WOsu three.js player
+*/
+WOsu.ThreePlayer = function (options) {
+    WOsu.Player.call(this, options);
+
+    // Initialize Three.js
+    this.initThree();
+}
+
+WOsu.ThreePlayer.prototype = Object.create(WOsu.Player.prototype);
+
+WOsu.ThreePlayer.prototype.constructor = WOsu.ThreePlayer;
+
+WOsu.ThreePlayer.prototype.initThree = function () {
+    var instance = this;
+
+    // New renderer, no sorting
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setClearColor(0x000000, 0.0);
+    renderer.setSize(this.width, this.height);
+    renderer.sortObjects = false;
+
+    // Three.js Scene
+    var scene = new THREE.Scene();
+
+    // TODO Rendering target for layers
+    var target = new THREE.WebGLRenderTarget(this.width, this.height, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.NearestFilter,
+        format: THREE.RGBFormat
+    });
+
+    // Allow cross origin loading (?)
+    THREE.ImageUtils.crossOrigin = "";
+
+    // Need to scale to at least 640 x 480 units
+    var ratio = this.height / this.width;
+    var camera;
+    if (ratio > 0.75) { // Width limit
+        camera = new THREE.OrthographicCamera(-320, 320, 320 * ratio, -320 * ratio, 1, 1e5);
+    }
+    else { // Height limit
+        camera = new THREE.OrthographicCamera(-240 / ratio, 240 / ratio, 240, -240, 1, 1e5);
+    }
+    camera.position.set(0, 0, 2);
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    this.three = {
+        renderer: renderer,
+        camera: camera,
+        scene: scene,
+        target: target
+    };
+
+    // TODO handle resizing
+
+    this.elements.three = renderer.domElement;
+}
+
+WOsu.Player.prototype.loadRenderer = function (loadResync) {
+    var instance = this;
+
+    this.callback.progress("Three", "Loading objects");
+
+    this.three.layers = {};
+
+    this.three.materials = {};
+
+    WOsu.resync(instance, [{
+        fn: instance.loadThreeStoryboard
+    }, {
+        fn: instance.loadThreeGameplay
+    }, {
+        fn: instance.loadThreeReplay
+    }, {
+        fn: instance.loadThreeUI
+    }, {
+        fn: instance.loadThreeStatistics
+    }], function () {
+        // Finish up
+        instance.loadThreeScene();
+
+        instance.callback.progress("Three", "Finished");
+
+        loadResync();
+    });
+}
+
+
 /**
     Handles scoring
 */
@@ -3504,6 +4233,11 @@ WOsu.ScoreManager = function(mechanics) {
     this.hit300g = 0;
     this.hit300k = 0;
     this.hit100k = 0;
+    
+    this.score1000 = 0; // Spinner bonus
+    this.score100 = 0; // Spinner spins
+    this.score30 = 0; // Slider ticks
+    this.score10 = 0; // Slider points
     
     this.combos = [];
 }
@@ -3593,6 +4327,7 @@ WOsu.ScoreManager.prototype.record0 = function() {
     Record a slider tick.
 */
 WOsu.ScoreManager.prototype.record10 = function() {
+    this.score10++;
     this.totalScore += 10;
 }
 
@@ -3600,7 +4335,24 @@ WOsu.ScoreManager.prototype.record10 = function() {
     Record a slider point.
 */
 WOsu.ScoreManager.prototype.record30 = function() {
+    this.score30++;
     this.totalScore += 30;
+}
+
+/**
+    Record a spinner spin.
+*/
+WOsu.ScoreManager.prototype.recordSpin = function(times) {
+    this.score100 += times;
+    this.totalScore += 100 * times;
+}
+
+/**
+    Record a spinner bonus.
+*/
+WOsu.ScoreManager.prototype.recordBonus = function(times) {
+    this.score1000 += times;
+    this.totalScore += 1000 * times;
 }
 
 // TODO Other record amounts + k, g

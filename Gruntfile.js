@@ -34,6 +34,7 @@ module.exports = function(grunt) {
 					"lib/object/SpinnerObject.js",
 					
 					"lib/player/Player.js",
+					"lib/player/ThreePlayer.js",
 					"lib/player/ScoreManager.js",
 					
 					"lib/math/Matrix3.js",
