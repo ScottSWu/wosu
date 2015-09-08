@@ -35,6 +35,7 @@ module.exports = function (grunt) {
 
 					"lib/player/Player.js",
 					"lib/player/ThreePlayer.js",
+					"lib/player/LocalThreePlayer.js",
 					"lib/player/ScoreManager.js",
 
 					"lib/math/Matrix3.js",

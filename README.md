@@ -3,10 +3,18 @@ wosu
 
 Web osu! library.
 
-This is a library primarily based off of three.js and lzma.js for reading and displaying osu! related files.
+This is a javascript library for reading and displaying osu! related files.
 
 An example of this library in use can be found [here](http://sc-wu.com/p/wosu/).
 
+
+
+Project Layout
+----
+
+This project is built using grunt. However, since certain files need to be in the right order, each file is currently manually listed within the Gruntfile. Grunt concatenates all scripts in `lib` into `ext/WOsu.js` and `ext/WOsu.js.map`. `ext` also contains other necessary libraries - Three.js and lzma.js.
+
+wosu provides structures and parsers for beatmaps, storyboards, skins and replays. Additionally, wosu provides a player which aims to play any combination of items.
 
 
 Structures
@@ -79,8 +87,31 @@ Finally, the player may be started using
     player.play();
 
 
-Development
+TODO
 ----
 
-Use grunt to concatenate and map all files. However, since certain files need to be in the right order, each file is currently listed within the Gruntfile.
-Grunt concatenates all scripts in `lib` into `ext/WOsu.js` and `ext/WOsu.js.map`.
+Since this project was started with a focus on web-based replays, the primary task is to accurately playback replays.
+ - Figure out how to compute the difficulty multiplier
+ - Compute spinner spins
+ - Edge cases for sliders
+ - Apply mods (including unranked mods)
+
+I am bad at organizing code:
+ - Finish abstracting the Player class (into ThreePlayer.js)
+ - Abstract the Skin class (to not rely on Three.js)
+ - Provide multiple entrypoints into the loading the Player
+ - Consistent camelBack case
+ - Drag and drop
+
+Less important are visual issues:
+ - Render stacked notes properly
+ - Components: follow points, slider repeats animation, spinner meter
+ - Skin logic: colors, HD textures
+ - Port storyboard renderer from a previous project
+ - !! Kiai time !!
+ - Health and score UI
+
+Future:
+ - More gamemodes
+ - More renderers (CSS, Canvas)
+ - Export to video
